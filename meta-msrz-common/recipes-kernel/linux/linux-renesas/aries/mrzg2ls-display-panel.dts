@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree Source for the MRZG2LS Single A55 SMARC SOM/CARRIER
+ *
+ * Copyright (C) 2021 Renesas Electronics Corp.
+ * Copyright (C) 2023 ARIES Embedded
+ */
+
+/dts-v1/;
+#include "../renesas/r9a07g044l2.dtsi"
+#include "mrzg2ls-som.dtsi"
+#include "mrzg2ls-pinfunction.dtsi"
+#include "msrz-smarc-common.dtsi"
+#include "mrzg2ls.dtsi"
+
+/ {
+	model = "ARIES MRZG2LS SMARC SoM on EVK with Display Panel";
+	compatible = "aries,msrz2gls", "renesas,r9a07g044l2", "renesas,r9a07g044";
+
+        backlight: backlight {
+                compatible = "pwm-backlight";
+		pinctrl-0 = <&bl_pins>;
+		pinctrl-names = "default";
+                pwms = <&gpt5 0 50000>;
+                brightness-levels = <0 2 8 16 32 64 128 255>;
+                default-brightness-level = <6>;
+        };
+
+	panel_rgb: panel-rgb {
+		compatible = "ampire,am800480r2";
+		backlight = <&backlight>;
+
+		port {
+			panel_in_rgb: endpoint {
+				remote-endpoint = <&tc9595_out_rgb>;
+			};
+		};
+	};
+};
+
+&dsi0 {
+	status = "okay";
+
+	ports {
+		port@1 {
+			dsi0_out: endpoint {
+				remote-endpoint = <&tc9595_in>;
+				data-lanes = <1 2 3 4>;
+			};
+		};
+	};
+};
+
+&gpt5 {
+	status = "okay";
+	channel = "channel_A";
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_pins>;
+	pinctrl-names = "default";
+	clock-frequency = <100000>;
+	status = "okay";
+
+	display_bridge: tc9595@68 {
+		compatible = "toshiba,tc358767";
+		reg = <0x68>;
+		clock-names = "ref";
+		clocks = <&tc9595_clk>;
+		interrupt-parent = <&pinctrl>;
+		interrupts = <RZG2L_GPIO(2, 1) IRQ_TYPE_LEVEL_HIGH>; /* P2_1 */
+		data-lanes = <1 2 3 4>;
+		toshiba,hpd-pin = <0>;
+		status = "okay";
+
+		ports {
+	      		#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				tc9595_in: endpoint {
+					data-lanes = <1 2 3 4>;
+					remote-endpoint = <&dsi0_out>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				tc9595_out_rgb: endpoint {
+					remote-endpoint = <&panel_in_rgb>;
+				};
+			};
+		};
+	};
+
+	touch: ft5426@38 {
+		compatible = "edt,edt-ft5506";
+		reg = <0x38>;
+		interrupt-parent = <&pinctrl>;
+		interrupts = <RZG2L_GPIO(47, 2) IRQ_TYPE_EDGE_FALLING>; /* P47_2 */
+		touchscreen-size-x = <800>;
+		touchscreen-size-y = <480>;
+		status = "okay";
+	};
+};
+
+&pinctrl {
+	bl_pins: bl {
+		pinmux = <RZG2L_PORT_PINMUX(43, 2, 2)>; /* GPT5 */
+	};
+};
+
+&vccq_sdhi1 {
+	gpios = <&pinctrl RZG2L_GPIO(39, 1) GPIO_ACTIVE_HIGH>;
+	regulator-boot-on;
+	regulator-always-on;
+};

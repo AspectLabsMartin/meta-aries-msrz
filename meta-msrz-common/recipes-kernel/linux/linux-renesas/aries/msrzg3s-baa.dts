@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+/*
+ * Device Tree Source for the ARIES embedded MSRZG3S OSM on G3SBerry board
+ *
+ * Copyright (C) 2025 ARIES Embedded
+ */
+
+/dts-v1/;
+
+#include "../renesas/r9a08g045s33.dtsi"
+#include "msrzg3s.dtsi"
+
+/ {
+	model = "ARIES Embedded MSRZG3S-BAA OSM on G3Sberry";
+	compatible = "aries,msrzg3-baa", "aries,msrzg3",
+		     "renesas,r9a08g045s33", "renesas,r9a08g045";
+
+	memory@48000000 {
+		device_type = "memory";
+		/* First 128MB is reserved for secure area. */
+		reg = <0x0 0x48000000 0x0 0x38000000>;
+	};
+};
+
+&pinctrl {
+	sdhi0_pins: sd0 {
+		data {
+			pins = "SD0_DATA0", "SD0_DATA1", "SD0_DATA2", "SD0_DATA3",
+			       "SD0_DATA4", "SD0_DATA5", "SD0_DATA6", "SD0_DATA7";
+			power-source = <1800>;
+		};
+
+		ctrl {
+			pins = "SD0_CLK", "SD0_CMD", "SD0_RST#";
+			power-source = <1800>;
+		};
+
+		rst {
+			pins = "SD0_RST#";
+			power-source = <1800>;
+		};
+	};
+};
+
+/* eMMC */
+&sdhi0 {
+	pinctrl-0 = <&sdhi0_pins>;
+	pinctrl-1 = <&sdhi0_pins>;
+	pinctrl-names = "default", "state_uhs";
+	vmmc-supply = <&reg_3p3v>;
+	vqmmc-supply = <&reg_1p8v>;
+	bus-width = <8>;
+	mmc-hs200-1_8v;
+	non-removable;
+	fixed-emmc-driver-type = <1>;
+	//max-frequency = <125000000>;
+	status = "okay";
+};

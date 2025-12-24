@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree Source for the MSRZG2UL Single A55 OSM
+ *
+ * Copyright (C) 2021 Renesas Electronics Corp.
+ * Copyright (C) 2023 ARIES Embedded
+ */
+
+/dts-v1/;
+#include "../renesas/r9a07g043u.dtsi"
+#include "msrzg2ul.dtsi"
+
+/ {
+	model = "ARIES MSRZ2GUL-A0A OSM";
+	compatible = "aries,msrz2gul-a0a", "aries,msrz2gul", "renesas,r9a07g043u11", "renesas,r9a07g043";
+
+	memory@48000000 {
+		device_type = "memory";
+		/* first 128MB is reserved for secure area. */
+		reg = <0x0 0x48000000 0x0 0x18000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		global_cma: linux,cma@58000000 {
+			compatible = "shared-dma-pool";
+			linux,cma-default;
+			reusable;
+			reg = <0x0 0x58000000 0x0 0x04000000>;
+		};
+		//mmp_reserved: linux,multimedia {
+		//	compatible = "shared-dma-pool";
+		//	reusable;
+		//	reg = <0x00000000 0x68000000 0x0 0x4000000>;
+		//};
+	};
+};
+
+&ehci0 {
+	memory-region = <&global_cma>;
+};
+
+&ohci0 {
+	memory-region = <&global_cma>;
+};
+
+&ehci1 {
+	memory-region = <&global_cma>;
+};
+
+&ohci1 {
+	memory-region = <&global_cma>;
+};

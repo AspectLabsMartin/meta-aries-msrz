@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree Source for the MRZG2LS Single A55 SMARC SOM/CARRIER
+ *
+ * Copyright (C) 2021 Renesas Electronics Corp.
+ * Copyright (C) 2023 ARIES Embedded
+ */
+
+/dts-v1/;
+#include "../renesas/r9a07g044l2.dtsi"
+#include "mrzg2ls-som.dtsi"
+#include "mrzg2ls-pinfunction.dtsi"
+#include "msrz-smarc-common.dtsi"
+#include "mrzg2ls.dtsi"
+
+/ {
+	model = "ARIES MRZG2LS SMARC SoM on EVK";
+	compatible = "aries,msrz2gls", "renesas,r9a07g044l2", "renesas,r9a07g044";
+};
+
+&vccq_sdhi1 {
+	gpios = <&pinctrl RZG2L_GPIO(39, 1) GPIO_ACTIVE_HIGH>;
+	regulator-boot-on;
+	regulator-always-on;
+};
