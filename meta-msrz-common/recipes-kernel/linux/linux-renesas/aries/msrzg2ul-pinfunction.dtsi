@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Pin function definitions for MSRZG2UL OSM
+ *
+ * Copyright (C) 2023 ARIES Embedded
+ */
+
+#include <dt-bindings/pinctrl/rzg2l-pinctrl.h>
+
+&pinctrl {
+	/* Note: SSI audio pins for msrzg2ul are not available on this board
+	 * Audio support disabled in device tree to prevent probe failures
+	 */
+};
+

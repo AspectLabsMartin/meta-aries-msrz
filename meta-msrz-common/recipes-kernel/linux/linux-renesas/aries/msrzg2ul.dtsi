@@ -126,12 +126,13 @@
 };
 
 /* Audio clock frequency configuration - SSI0 requires non-zero frequencies */
+/* AE400 hardware uses 24.576 MHz oscillator on AUDIO_CLK1 input */
 &audio_clk1 {
-	clock-frequency = <12288000>;  /* 48kHz * 256 for audio I2S */
+	clock-frequency = <24576000>;  /* 48kHz * 512 for audio I2S (24.576 MHz) */
 };
 
 &audio_clk2 {
-	clock-frequency = <11289600>;  /* 44.1kHz * 256 for audio I2S */
+	clock-frequency = <0>;  /* Not connected on AE400 hardware */
 };
 
 &sbc {
@@ -264,7 +265,7 @@
 &ssi0 {
 	pinctrl-0 = <&ssi0_pins>;
 	pinctrl-names = "default";
-	status = "okay";
+	status = "disabled";	/* Audio not supported on this board */
 };
 
 &i2c0 {

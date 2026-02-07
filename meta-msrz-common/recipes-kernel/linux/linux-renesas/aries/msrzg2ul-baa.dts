@@ -95,7 +95,7 @@
 		pinmux = <RZG2L_PORT_PINMUX(6, 2, 3)>,  /* CAN0_RX */
 		         <RZG2L_PORT_PINMUX(13, 1, 3)>; /* CAN0_TX */
 	};
-	
+
 	can1_pins: can1 {
 		pinmux = <RZG2L_PORT_PINMUX(14, 1, 3)>, /* CAN1_RX */
 		         <RZG2L_PORT_PINMUX(17, 0, 3)>; /* CAN1_TX */
@@ -118,7 +118,7 @@
 		         <RZG2L_PORT_PINMUX(4, 3, 1)>,  /* ET0_MDC */
 		         <RZG2L_PORT_PINMUX(4, 4, 1)>;  /* ET0_MDIO */
 	};
-	
+
 	/* Ethernet 1 Pins (RGMII) */
 	eth1_pins: eth1 {
 		pinmux = <RZG2L_PORT_PINMUX(7, 0, 1)>,  /* ET1_TXCLK */
@@ -137,11 +137,18 @@
 		         <RZG2L_PORT_PINMUX(10, 3, 1)>; /* ET1_MDIO */
 	};
 
-	/* I2S/SSI Pins */
+	/* Audio Clock Input Pins - from external 12.288MHz oscillator */
+	sound_clk_pins: sound_clk {
+		pins = "AUDIO_CLK1", "AUDIO_CLK2";
+		input-enable;
+	};
+
+	/* I2S/SSI Pins - Port 11 on RZ/G2UL */
 	ssi0_pins: ssi0 {
-		pinmux = <RZG2L_PORT_PINMUX(11, 0, 1)>, /* BCLK */
-		         <RZG2L_PORT_PINMUX(11, 1, 1)>, /* LRCLK */
-		         <RZG2L_PORT_PINMUX(11, 2, 1)>; /* DIN */
+		pinmux = <RZG2L_PORT_PINMUX(11, 0, 1)>, /* BCK */
+		         <RZG2L_PORT_PINMUX(11, 1, 1)>, /* RCK/LRCLK */
+		         <RZG2L_PORT_PINMUX(11, 2, 1)>, /* TXD (playback) */
+		         <RZG2L_PORT_PINMUX(11, 3, 1)>; /* RXD (record) */
 	};
 
 	/* GPS UART Pins */
@@ -197,7 +204,7 @@
 
 /* I2S Audio Configuration */
 &ssi0 {
-	pinctrl-0 = <&ssi0_pins>;
+	pinctrl-0 = <&ssi0_pins &sound_clk_pins>;
 	pinctrl-names = "default";
 	status = "okay";
 };
@@ -222,7 +229,15 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,bitclock-master = <&dailink0_master>;
 		simple-audio-card,frame-master = <&dailink0_master>;
-		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,mclk-fs = <512>;  /* 24.576 MHz / 48000 Hz = 512 */
+
+		/* DAPM widgets - define the external speaker endpoint */
+		simple-audio-card,widgets =
+			"Speaker", "Ext Spk";
+
+		/* DAPM routing - connect codec output to external speaker */
+		simple-audio-card,routing =
+			"Ext Spk", "Speaker";
 
 		dailink0_master: simple-audio-card,cpu {
 			sound-dai = <&ssi0>;

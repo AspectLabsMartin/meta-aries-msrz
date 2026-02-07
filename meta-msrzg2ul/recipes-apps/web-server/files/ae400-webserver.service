@@ -1,0 +1,14 @@
+[Unit]
+Description=AE400 Inverter Web Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ae400-webserver 80
+WorkingDirectory=/var/www
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

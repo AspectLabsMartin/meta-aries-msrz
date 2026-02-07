@@ -9,4 +9,9 @@ inherit core-image
 IMAGE_INSTALL += " \
     packagegroup-msrz-base \
     packagegroup-msrz-bringup \
+    tzdata \
+    iproute2 \
+    can-gateway \
+    web-server \
+    can-flash-tool \
     "

@@ -116,8 +116,15 @@ run_docker() {
 	# mount deploy dir
 	ODIR="--volume $(realpath $OUTPUT_DIR):/opt/deploy"
 
+	# Detect if running with TTY
+	if [ -t 0 ] && [ -t 1 ]; then
+		TTY_FLAG="-it"
+	else
+		TTY_FLAG="-i"
+	fi
+
 	# run container
-	docker run --rm -it $WDIR $DDIR $ODIR -e BUILDENV=$BUILDENV $DOCKERNAME "$@"
+	docker run --rm $TTY_FLAG $WDIR $DDIR $ODIR -e BUILDENV=$BUILDENV $DOCKERNAME "$@"
 }
 
 ARGS=$(getopt -q --options $SHORTOPTS --name $PROGNAME -- "$@")

@@ -1,2 +1,2 @@
-# Don't auto-start
-NO_START=1
+# Auto-start dropbear SSH server
+NO_START=0
