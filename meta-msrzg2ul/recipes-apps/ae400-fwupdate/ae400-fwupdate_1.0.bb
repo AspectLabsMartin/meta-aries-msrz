@@ -34,6 +34,9 @@ do_install() {
 FILES:${PN} = " \
     ${bindir}/firmware-update-service \
     ${sysconfdir}/init.d/firmware-update-service \
+    /usr/share/sounds/usb-update-running.wav \
+    /usr/share/sounds/usb-update-aborted.wav \
+    /usr/share/sounds/usb-update-finished.wav \
     /var/lib/firmware-updates \
     /var/lib/firmware-updates/history \
 "

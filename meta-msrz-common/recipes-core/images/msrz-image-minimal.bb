@@ -12,6 +12,14 @@ IMAGE_INSTALL += " \
     tzdata \
     iproute2 \
     can-gateway \
+    ae400-fwupdate \
     web-server \
     can-flash-tool \
+    database-logger \
+    "
+
+# Explicitly remove legacy standalone USB update daemon from the image.
+# USB and Web update orchestration is handled by firmware-update-service.
+IMAGE_INSTALL:remove = " \
+    usb-update-service \
     "
