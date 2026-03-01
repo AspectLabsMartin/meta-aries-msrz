@@ -18,6 +18,12 @@ RDEPENDS:${PN} = "can-flash-tool"
 INITSCRIPT_NAME = "firmware-update-service"
 INITSCRIPT_PARAMS = "defaults 90 10"
 
+# Prevent RPM directory ownership conflicts with base-system packages
+# (sysvinit owns /etc/init.d, base-files owns /var/lib, alsa-utils owns
+# /usr/share/sounds).  With DIRFILES set, only empty or explicitly listed
+# directories get %dir entries in the RPM spec.
+DIRFILES = "/var/lib/firmware-updates /var/lib/firmware-updates/history"
+
 # Pass CC and LDFLAGS from Yocto, let Makefile's CFLAGS += handle include paths
 EXTRA_OEMAKE = "CC='${CC}' LDFLAGS='${LDFLAGS}'"
 
@@ -34,9 +40,9 @@ do_install() {
 FILES:${PN} = " \
     ${bindir}/firmware-update-service \
     ${sysconfdir}/init.d/firmware-update-service \
-    /usr/share/sounds/usb-update-running.wav \
-    /usr/share/sounds/usb-update-aborted.wav \
-    /usr/share/sounds/usb-update-finished.wav \
+    /usr/share/sounds/system-update-started.wav \
+    /usr/share/sounds/system-update-aborted.wav \
+    /usr/share/sounds/system-update-finished.wav \
     /var/lib/firmware-updates \
     /var/lib/firmware-updates/history \
 "
