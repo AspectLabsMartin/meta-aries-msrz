@@ -21,6 +21,9 @@ RDEPENDS:${PN} = "sqlite3"
 INITSCRIPT_NAME = "database-logger"
 INITSCRIPT_PARAMS = "defaults 80 20"
 
+# Prevent RPM directory ownership conflicts with base-system packages
+DIRFILES = "/var/lib/database-logger /var/lib/database-logger/spool /etc/database-logger /etc/ae400/config_registry.d"
+
 # Pass CC and LDFLAGS from Yocto
 EXTRA_OEMAKE = "CC='${CC}' LDFLAGS='${LDFLAGS}'"
 

@@ -18,6 +18,9 @@ RDEPENDS:${PN} = "can-flash-tool"
 INITSCRIPT_NAME = "usb-update-service"
 INITSCRIPT_PARAMS = "defaults 95 05"
 
+# Prevent RPM directory ownership conflicts with base-system packages
+DIRFILES = ""
+
 # Pass CC and LDFLAGS from Yocto
 EXTRA_OEMAKE = "CC='${CC}' LDFLAGS='${LDFLAGS}'"
 

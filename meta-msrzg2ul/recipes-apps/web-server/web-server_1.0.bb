@@ -17,7 +17,7 @@ INITSCRIPT_NAME = "ae400-webserver"
 INITSCRIPT_PARAMS = "defaults 90 10"
 
 # Ensure proper build environment
-DEPENDS = ""
+DEPENDS = "sqlite3"
 
 # Service account: ae400web (FR-040 least-privilege)
 USERADD_PACKAGES = "${PN}"
@@ -49,6 +49,17 @@ do_install() {
     if [ -f ${TOPDIR}/../shared/config/schema/config_user.schema.json ]; then
         install -m 0644 ${TOPDIR}/../shared/config/schema/config_user.schema.json \
             ${D}/usr/share/ae400/config/schema/config_user.schema.json
+    fi
+
+    # Install AspectMon variable map definition
+    install -d ${D}/usr/share/ae400/aspectmon
+    if [ -f ${TOPDIR}/../config/aspectmon/varmap_default.json ]; then
+        install -m 0644 ${TOPDIR}/../config/aspectmon/varmap_default.json \
+            ${D}/usr/share/ae400/aspectmon/varmap_default.json
+    fi
+    if [ -f ${TOPDIR}/../config/aspectmon/symbols.json ]; then
+        install -m 0644 ${TOPDIR}/../config/aspectmon/symbols.json \
+            ${D}/usr/share/ae400/aspectmon/symbols.json
     fi
 
     # Install web root directory (read-only for service)
@@ -89,4 +100,4 @@ FILES:${PN} += "${bindir}/ae400-webserver \
                 /usr/share/ae400 \
                 ${systemd_system_unitdir}/ae400-webserver.service"
 
-RDEPENDS:${PN} = ""
+RDEPENDS:${PN} = "libsqlite3"
