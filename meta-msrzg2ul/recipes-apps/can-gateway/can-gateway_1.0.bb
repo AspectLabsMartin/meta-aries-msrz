@@ -30,13 +30,13 @@ do_compile() {
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${S}/ae400 ${D}${bindir}/ae400
-    # Optional: Install default configs
-    install -d ${D}${sysconfdir}/can-gateway
+    # Optional: Install default configs to /etc/ae400/
+    install -d ${D}${sysconfdir}/ae400
     if [ -f ${S}/config_user.json ]; then
-        install -m 0644 ${S}/config_user.json ${D}${sysconfdir}/can-gateway/config_user.json
+        install -m 0664 ${S}/config_user.json ${D}${sysconfdir}/ae400/config_user.json
     fi
     if [ -f ${S}/config_factory.json ]; then
-        install -m 0644 ${S}/config_factory.json ${D}${sysconfdir}/can-gateway/config_factory.json
+        install -m 0644 ${S}/config_factory.json ${D}${sysconfdir}/ae400/config_factory.json
     fi
     # Install audio files
     install -d ${D}${sysconfdir}/ae400/sounds
@@ -61,7 +61,6 @@ SYSTEMD_AUTO_ENABLE = "enable"
 RDEPENDS:${PN} = "bash alsa-utils"
 
 FILES:${PN} += "${bindir}/ae400 \
-                ${sysconfdir}/can-gateway \
-                ${sysconfdir}/ae400/sounds \
+                ${sysconfdir}/ae400 \
                 ${sysconfdir}/init.d/ae400 \
                 ${systemd_system_unitdir}/ae400-can-gateway.service"

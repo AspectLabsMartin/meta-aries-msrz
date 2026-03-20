@@ -17,7 +17,7 @@ INITSCRIPT_NAME = "ae400-webserver"
 INITSCRIPT_PARAMS = "defaults 90 10"
 
 # Ensure proper build environment
-DEPENDS = "sqlite3"
+DEPENDS = "sqlite3 openssl"
 
 # Service account: ae400web (FR-040 least-privilege)
 USERADD_PACKAGES = "${PN}"
@@ -38,11 +38,13 @@ do_install() {
     install -d ${D}${bindir}
     install -m 0755 server ${D}${bindir}/ae400-webserver
 
-    # Install configuration
-    install -d ${D}${sysconfdir}/ae400
-    if [ -f config/inverter.json ]; then
-        install -m 0644 config/inverter.json ${D}${sysconfdir}/ae400/inverter.json
-    fi
+    # /etc/ae400 directory is owned by can-gateway package.
+    # Permissions are set in pkg_postinst below.
+
+    # Create config archive spool directory (FR-010)
+    install -d ${D}/var/lib/database-logger/spool/config-archive
+    chown ae400web:ae400web ${D}/var/lib/database-logger/spool/config-archive
+    chmod 0755 ${D}/var/lib/database-logger/spool/config-archive
 
     # Install config schema for the configuration UI
     install -d ${D}/usr/share/ae400/config/schema
@@ -90,14 +92,26 @@ do_install() {
 SYSTEMD_SERVICE:${PN} = "ae400-webserver.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
-# Avoid owning the shared directory to prevent RPM conflicts with can-gateway
-# List only the concrete files we install under /etc/ae400
+# Do NOT list ${sysconfdir}/ae400 here — can-gateway owns that directory.
+# Only list concrete files we install.
 FILES:${PN} += "${bindir}/ae400-webserver \
-                ${sysconfdir}/ae400/inverter.json \
                 ${sysconfdir}/init.d/ae400-webserver \
                 /var/www \
                 /var/lib/ae400-webserver \
+                /var/lib/database-logger/spool/config-archive \
                 /usr/share/ae400 \
                 ${systemd_system_unitdir}/ae400-webserver.service"
 
 RDEPENDS:${PN} = "libsqlite3"
+
+# Set /etc/ae400 permissions and fix config ownership at first boot.
+# The directory itself is installed by can-gateway; we only adjust permissions.
+pkg_postinst:${PN}() {
+    if [ -d $D${sysconfdir}/ae400 ]; then
+        chgrp ae400web $D${sysconfdir}/ae400
+        chmod 0775 $D${sysconfdir}/ae400
+    fi
+    if [ -f $D${sysconfdir}/ae400/config_user.json ]; then
+        chown ae400web:ae400web $D${sysconfdir}/ae400/config_user.json
+    fi
+}

@@ -40,6 +40,7 @@ do_install() {
 FILES:${PN} = " \
     ${bindir}/firmware-update-service \
     ${sysconfdir}/init.d/firmware-update-service \
+    ${sysconfdir}/ae400/firmware-signing-key.pub \
     /usr/share/sounds/system-update-started.wav \
     /usr/share/sounds/system-update-aborted.wav \
     /usr/share/sounds/system-update-finished.wav \
