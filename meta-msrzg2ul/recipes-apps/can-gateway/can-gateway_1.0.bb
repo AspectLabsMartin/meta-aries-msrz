@@ -43,6 +43,7 @@ do_install() {
     install -m 0644 ${S}/../support-files/startup.wav ${D}${sysconfdir}/ae400/sounds/startup.wav
     install -m 0644 ${S}/../support-files/poweron.wav ${D}${sysconfdir}/ae400/sounds/poweron.wav
     install -m 0644 ${S}/../support-files/poweroff.wav ${D}${sysconfdir}/ae400/sounds/poweroff.wav
+    install -m 0644 ${S}/../support-files/Cannotpoweroncheckbreaker.wav ${D}${sysconfdir}/ae400/sounds/Cannotpoweroncheckbreaker.wav
 
     # Install SysVinit script for auto-start at boot
     install -d ${D}${sysconfdir}/init.d
