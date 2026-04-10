@@ -31,7 +31,8 @@ do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${S}/ae400 ${D}${bindir}/ae400
     # Optional: Install default configs to /etc/ae400/
-    install -d ${D}${sysconfdir}/ae400
+    # 0775 + group ae400web so the web server can create temp files for atomic writes
+    install -d -m 0775 ${D}${sysconfdir}/ae400
     if [ -f ${S}/config_user.json ]; then
         install -m 0664 ${S}/config_user.json ${D}${sysconfdir}/ae400/config_user.json
     fi

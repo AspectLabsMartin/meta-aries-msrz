@@ -11,8 +11,10 @@ EXTERNALSRC_BUILD = "${EXTERNALSRC}"
 S = "${EXTERNALSRC}"
 B = "${S}"
 
-# Runtime dependencies - needs can-flash-tool for DSP updates
-RDEPENDS:${PN} = "can-flash-tool"
+# Runtime dependencies
+# - can-flash-tool: DSP image write utility used by update flow
+# - ae400-fwupdate: owns update-service audio cues under /usr/share/sounds
+RDEPENDS:${PN} = "can-flash-tool ae400-fwupdate"
 
 # Init script configuration
 INITSCRIPT_NAME = "usb-update-service"

@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Aspect Labs <dev@aspectlabs.com>
+Date: Tue, 01 Apr 2026 00:00:00 +1000
+Subject: [PATCH] rtl8xxxu: add RTL8188EUS (0bda:8179) device ID
+
+Add the Realtek RTL8188EUS USB Wi-Fi dongle (vendor 0x0bda, product
+0x8179) to the rtl8xxxu untested device table using rtl8192cu_fops.
+
+The RTL8188EUS is an 8188E-generation chip.  On kernel 5.10 the
+rtl8xxxu driver lacks dedicated 8188E support so the probe will
+likely fail gracefully at chip-version detection; however adding the
+ID is safe and allows future backport of 8188E support without
+re-patching the device table.
+
+Signed-off-by: Aspect Labs <dev@aspectlabs.com>
+---
+ drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu_core.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu_core.c b/drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu_core.c
+index 1234567..abcdefg 100644
+--- a/drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu_core.c
++++ b/drivers/net/wireless/realtek/rtl8xxxu/rtl8xxxu_core.c
+@@ -6818,6 +6818,9 @@ static const struct usb_device_id dev_table[] = {
+ #ifdef CONFIG_RTL8XXXU_UNTESTED
+ /* Still supported by rtlwifi */
+ {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8176, 0xff, 0xff, 0xff),
+ 	.driver_info = (unsigned long)&rtl8192cu_fops},
++/* Realtek RTL8188EUS - N150 USB dongle */
++{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8179, 0xff, 0xff, 0xff),
++	.driver_info = (unsigned long)&rtl8192cu_fops},
+ {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_REALTEK, 0x8178, 0xff, 0xff, 0xff),
+ 	.driver_info = (unsigned long)&rtl8192cu_fops},
