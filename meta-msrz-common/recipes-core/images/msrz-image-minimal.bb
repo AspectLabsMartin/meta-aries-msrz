@@ -48,6 +48,10 @@ IMAGE_INSTALL += " \
     iw \
     wpa-supplicant \
     hostapd \
+    dnsmasq \
+    iptables \
+    wireless-regdb \
+    rfkill \
     linux-firmware-mt76x2 \
     wifi-apsta \
     "
