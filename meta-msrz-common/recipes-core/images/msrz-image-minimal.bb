@@ -45,4 +45,9 @@ IMAGE_INSTALL += " \
     web-server \
     can-flash-tool \
     database-logger \
+    iw \
+    wpa-supplicant \
+    hostapd \
+    linux-firmware-mt76x2 \
+    wifi-apsta \
     "

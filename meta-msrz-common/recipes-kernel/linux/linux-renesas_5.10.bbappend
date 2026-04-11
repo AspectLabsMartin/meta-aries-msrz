@@ -10,6 +10,11 @@ SRC_URI_append = "${@oe.utils.conditional("IS_RT_BSP", "1", " file://aries/", ""
 # Add kernel config fragment for audio support
 SRC_URI_append = " file://audio.cfg"
 
+# Add kernel config fragments for USB WiFi (MT7612U AP+STA)
+SRC_URI_append = " file://wifi-usb.cfg"
+SRC_URI_append = " file://mt76-wifi.cfg"
+SRC_URI_append = " file://netfilter.cfg"
+
 do_configure_append() {
     if [ "${IS_RT_BSP}" = "1" ]; then
         # Copy ARIES device tree files to kernel source for RT build
