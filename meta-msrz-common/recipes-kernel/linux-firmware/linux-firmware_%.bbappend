@@ -11,6 +11,15 @@ LICENSE_${PN}-mt76x2 = "Firmware-ralink_a_mediatek_company_firmware"
 FILES_${PN}-mt76x2 = " \
   ${nonarch_base_libdir}/firmware/mediatek/mt7662.bin \
   ${nonarch_base_libdir}/firmware/mediatek/mt7662_rom_patch.bin \
+  ${nonarch_base_libdir}/firmware/mt7662.bin \
+  ${nonarch_base_libdir}/firmware/mt7662_rom_patch.bin \
 "
 
 RDEPENDS_${PN}-mt76x2 += "${PN}-mt7601u-license"
+
+# Kernel 5.10 mt76x2u requests firmware without the mediatek/ prefix.
+# Create symlinks so both paths work.
+do_install_append() {
+    ln -sf mediatek/mt7662.bin ${D}${nonarch_base_libdir}/firmware/mt7662.bin
+    ln -sf mediatek/mt7662_rom_patch.bin ${D}${nonarch_base_libdir}/firmware/mt7662_rom_patch.bin
+}

@@ -1,6 +1,7 @@
 SUMMARY = "AE400 WiFi AP+STA concurrent mode configuration"
 DESCRIPTION = "Configuration files and init script for running simultaneous \
-WiFi Access Point and Station (client) on a MediaTek MT7612U USB dongle."
+WiFi Access Point and Station (client) on a MediaTek MT7612U USB dongle. \
+Includes USB scatter-gather disable for stability (openwrt/mt76#405)."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
@@ -9,6 +10,7 @@ SRC_URI = " \
     file://hostapd-ap0.conf \
     file://wpa_supplicant-wlan0.conf \
     file://dnsmasq-ap0.conf \
+    file://mt76-usb.conf \
 "
 
 inherit update-rc.d
@@ -27,6 +29,10 @@ do_install() {
     install -m 0644 ${WORKDIR}/hostapd-ap0.conf ${D}${sysconfdir}/hostapd-ap0.conf
     install -m 0600 ${WORKDIR}/wpa_supplicant-wlan0.conf ${D}${sysconfdir}/wpa_supplicant-wlan0.conf
     install -m 0644 ${WORKDIR}/dnsmasq-ap0.conf ${D}${sysconfdir}/dnsmasq-ap0.conf
+
+    # modprobe.d config: disable USB scatter-gather for mt76 stability
+    install -d ${D}${sysconfdir}/modprobe.d
+    install -m 0644 ${WORKDIR}/mt76-usb.conf ${D}${sysconfdir}/modprobe.d/mt76-usb.conf
 }
 
 RDEPENDS_${PN} = " \
@@ -43,6 +49,7 @@ CONFFILES_${PN} = " \
     ${sysconfdir}/hostapd-ap0.conf \
     ${sysconfdir}/wpa_supplicant-wlan0.conf \
     ${sysconfdir}/dnsmasq-ap0.conf \
+    ${sysconfdir}/modprobe.d/mt76-usb.conf \
 "
 
 FILES_${PN} = " \
@@ -50,4 +57,5 @@ FILES_${PN} = " \
     ${sysconfdir}/hostapd-ap0.conf \
     ${sysconfdir}/wpa_supplicant-wlan0.conf \
     ${sysconfdir}/dnsmasq-ap0.conf \
+    ${sysconfdir}/modprobe.d/mt76-usb.conf \
 "

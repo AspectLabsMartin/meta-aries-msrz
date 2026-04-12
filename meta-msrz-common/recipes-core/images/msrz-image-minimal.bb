@@ -54,4 +54,6 @@ IMAGE_INSTALL += " \
     rfkill \
     linux-firmware-mt76x2 \
     wifi-apsta \
+    usb-modeswitch \
+    usb-modeswitch-data \
     "

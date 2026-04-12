@@ -5,36 +5,63 @@
 # Required-Stop:     $local_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: WiFi AP+STA concurrent mode for MT7612U
-# Description:       Brings up wlan0 as STA client, creates ap0 virtual
-#                    interface as Access Point. Both share the same channel.
+# Short-Description: WiFi AP mode for MT7612U
+# Description:       Brings up wlan0 as an Access Point.
+#                    AP+STA concurrent mode is disabled due to driver bugs
+#                    (virtual interface beacon timer broken on kernel 5.10).
 ### END INIT INFO
 
+# Ensure sbin directories are in PATH — BusyBox default PATH is
+# /usr/bin:/bin which misses iw, hostapd, wpa_supplicant, iptables, etc.
+export PATH="/usr/sbin:/sbin:/usr/bin:/bin:$PATH"
+
 # -----------------------------------------------------------------------
-# AE400 WiFi AP+STA init script
+# AE400 WiFi AP init script  (production)
 #
 # Hardware : MediaTek MT7612U USB dongle (mt76x2u driver)
-# Topology : wlan0 = STA (client), ap0 = AP (access point)
-# Constraint: Both interfaces MUST operate on the same channel
+# Topology : wlan0 = AP (access point only)
+#
+# KNOWN DRIVER ISSUES (kernel 5.10 in-tree mt76x2u):
+#   1. Virtual AP (ap0) beacon timer broken (~0 TX beacons/5s)
+#   2. WPA2 handshake completes but client immediately disassociates
+#   3. STA on virtual interface stuck at AUTHENTICATING
+#
+# WORKAROUND: AP-only on wlan0 (primary), open mode (no WPA).
+#   - Client connects, gets DHCP, captive portal shows web UI
+#   - Re-enable AP+STA and WPA2 when driver is upgraded
+#
+# Startup sequence:
+#   1. USB mode-switch (if dongle presents as CD-ROM 0e8d:2870)
+#   2. Load mt76x2u driver (disable_usb_sg=1 via modprobe.d)
+#   3. Wait for wlan0
+#   4. Set regulatory domain (AU)
+#   5. Start hostapd on wlan0
+#   6. Start dnsmasq DHCP/captive-portal server
 #
 # Config files:
-#   /etc/wpa_supplicant-wlan0.conf  — STA network credentials
-#   /etc/hostapd-ap0.conf           — AP settings (SSID, passphrase)
-#   /etc/dnsmasq-ap0.conf           — DHCP server for AP clients
+#   /etc/hostapd-ap0.conf           — AP config (runs on wlan0)
+#   /etc/dnsmasq-ap0.conf           — DHCP + captive portal for AP clients
+#   /etc/modprobe.d/mt76-usb.conf   — disable_usb_sg=1
 # -----------------------------------------------------------------------
 
 WLAN_IF="wlan0"
-AP_IF="ap0"
 AP_IP="192.168.4.1"
 AP_NETMASK="255.255.255.0"
-AP_SUBNET="192.168.4"
 
-WPA_CONF="/etc/wpa_supplicant-wlan0.conf"
 HOSTAPD_CONF="/etc/hostapd-ap0.conf"
 DNSMASQ_CONF="/etc/dnsmasq-ap0.conf"
-WPA_PID="/var/run/wpa_supplicant_wlan0.pid"
 HOSTAPD_PID="/var/run/hostapd_ap0.pid"
 DNSMASQ_PID="/var/run/dnsmasq_ap0.pid"
+
+# USB IDs for the MT7612U dongle
+USB_CDROM_VID="0e8d"
+USB_CDROM_PID="2870"
+USB_WIFI_VID="0e8d"
+USB_WIFI_PID="7612"
+
+# Timeouts (seconds)
+USB_SWITCH_TIMEOUT=10
+IFACE_TIMEOUT=15
 
 LOGPFX="wifi-apsta"
 
@@ -43,10 +70,51 @@ log_msg() {
     echo "$LOGPFX: $1"
 }
 
-# Wait for a network interface to appear (up to timeout seconds)
+# -----------------------------------------------------------------------
+# USB mode-switch: some MT7612U dongles present as a USB CD-ROM
+# (0e8d:2870) on first plug-in.  usb_modeswitch flips them to WiFi mode.
+# -----------------------------------------------------------------------
+do_usb_modeswitch() {
+    # Check if dongle is in CD-ROM mode
+    if ! lsusb 2>/dev/null | grep -qi "${USB_CDROM_VID}:${USB_CDROM_PID}"; then
+        return 0  # Not in CD-ROM mode, nothing to do
+    fi
+    log_msg "MT7612U in CD-ROM mode (${USB_CDROM_VID}:${USB_CDROM_PID}), switching..."
+
+    # Try usb_modeswitch if available
+    if command -v usb_modeswitch >/dev/null 2>&1; then
+        usb_modeswitch -v "$USB_CDROM_VID" -p "$USB_CDROM_PID" \
+            -W -R -w 5000 2>/dev/null
+    else
+        # Fallback: try eject on the device
+        for dev in /dev/sr* /dev/cdrom; do
+            if [ -b "$dev" ]; then
+                eject "$dev" 2>/dev/null
+            fi
+        done
+    fi
+
+    # Wait for WiFi mode to appear
+    _tries=0
+    while [ "$_tries" -lt "$USB_SWITCH_TIMEOUT" ]; do
+        if lsusb 2>/dev/null | grep -qi "${USB_WIFI_VID}:${USB_WIFI_PID}"; then
+            log_msg "USB mode-switch successful"
+            sleep 1  # Let kernel enumerate the new device
+            return 0
+        fi
+        _tries=$((_tries + 1))
+        sleep 1
+    done
+    log_msg "WARN: USB mode-switch timeout, WiFi device may not appear"
+    return 1
+}
+
+# -----------------------------------------------------------------------
+# Wait for a network interface to appear
+# -----------------------------------------------------------------------
 wait_for_iface() {
     _iface="$1"
-    _timeout="${2:-10}"
+    _timeout="${2:-$IFACE_TIMEOUT}"
     _count=0
     while [ "$_count" -lt "$_timeout" ]; do
         if [ -d "/sys/class/net/$_iface" ]; then
@@ -58,9 +126,12 @@ wait_for_iface() {
     return 1
 }
 
+# -----------------------------------------------------------------------
 # Discover which phy the MT7612U USB dongle is on
+# -----------------------------------------------------------------------
 find_mt76_phy() {
     for _phy_path in /sys/class/ieee80211/phy*; do
+        [ -d "$_phy_path" ] || continue
         _phy=$(basename "$_phy_path")
         if [ -d "$_phy_path/device" ]; then
             _driver=$(basename "$(readlink -f "$_phy_path/device/driver")" 2>/dev/null)
@@ -73,7 +144,9 @@ find_mt76_phy() {
     return 1
 }
 
-# Find the managed (STA) interface name on the mt76 phy
+# -----------------------------------------------------------------------
+# Find the interface name on the mt76 phy
+# -----------------------------------------------------------------------
 find_mt76_iface() {
     _phy="$1"
     for _netdev in /sys/class/ieee80211/"$_phy"/device/net/*; do
@@ -85,15 +158,28 @@ find_mt76_iface() {
     return 1
 }
 
+# -----------------------------------------------------------------------
+# START
+# -----------------------------------------------------------------------
 do_start() {
-    log_msg "Starting AP+STA mode"
+    log_msg "Starting WiFi AP mode"
 
-    # --- Discover hardware ---
-    MT76_PHY=$(find_mt76_phy)
-    if [ -z "$MT76_PHY" ]; then
-        # Try loading the module
+    # --- Step 1: USB mode-switch if needed ---
+    do_usb_modeswitch
+
+    # --- Step 2: Load driver module ---
+    # The disable_usb_sg=1 parameter is set via /etc/modprobe.d/mt76-usb.conf
+    if ! lsmod | grep -q "mt76x2u"; then
+        log_msg "Loading mt76x2u driver module"
         modprobe mt76x2u 2>/dev/null
         sleep 2
+    fi
+
+    # --- Step 3: Discover hardware ---
+    MT76_PHY=$(find_mt76_phy)
+    if [ -z "$MT76_PHY" ]; then
+        # Module may need more time after USB enumeration
+        sleep 3
         MT76_PHY=$(find_mt76_phy)
         if [ -z "$MT76_PHY" ]; then
             log_msg "ERROR: MT7612U not found (no mt76x2u phy)"
@@ -102,100 +188,85 @@ do_start() {
     fi
     log_msg "Found MT7612U on $MT76_PHY"
 
-    # Identify the STA interface (kernel may name it wlx... or wlan0)
-    REAL_STA_IF=$(find_mt76_iface "$MT76_PHY")
-    if [ -z "$REAL_STA_IF" ]; then
+    # Identify the interface (kernel may name it wlx... or wlan0)
+    REAL_IF=$(find_mt76_iface "$MT76_PHY")
+    if [ -z "$REAL_IF" ]; then
         log_msg "ERROR: No network interface found on $MT76_PHY"
         return 1
     fi
 
     # If the interface isn't named wlan0, rename it for consistency
-    if [ "$REAL_STA_IF" != "$WLAN_IF" ]; then
-        ip link set "$REAL_STA_IF" down 2>/dev/null
-        ip link set "$REAL_STA_IF" name "$WLAN_IF" 2>/dev/null
+    if [ "$REAL_IF" != "$WLAN_IF" ]; then
+        ip link set "$REAL_IF" down 2>/dev/null
+        ip link set "$REAL_IF" name "$WLAN_IF" 2>/dev/null
         if [ $? -ne 0 ]; then
-            log_msg "WARN: Could not rename $REAL_STA_IF to $WLAN_IF, using $REAL_STA_IF"
-            WLAN_IF="$REAL_STA_IF"
+            log_msg "WARN: Could not rename $REAL_IF to $WLAN_IF, using $REAL_IF"
+            WLAN_IF="$REAL_IF"
+            # Update hostapd config to use actual interface name
+            sed -i "s/^interface=.*/interface=$WLAN_IF/" "$HOSTAPD_CONF"
         fi
     fi
-    log_msg "STA interface: $WLAN_IF"
+    log_msg "WiFi interface: $WLAN_IF"
 
-    # --- Create virtual AP interface ---
-    if [ -d "/sys/class/net/$AP_IF" ]; then
-        log_msg "AP interface $AP_IF already exists, removing"
-        iw dev "$AP_IF" del 2>/dev/null
-    fi
-    iw dev "$WLAN_IF" interface add "$AP_IF" type __ap
-    if [ $? -ne 0 ]; then
-        log_msg "ERROR: Failed to create AP interface $AP_IF"
-        return 1
-    fi
-    log_msg "Created AP interface: $AP_IF"
-
-    # --- Bring up STA ---
+    # --- Step 4: Set regulatory domain ---
+    # Must be done before any channel operations.  Requires
+    # CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=n or a valid regulatory.db.
     ip link set "$WLAN_IF" up
-    if [ -f "$WPA_CONF" ]; then
-        # Check if there are configured networks (not just comments)
-        if grep -q "^[[:space:]]*ssid=" "$WPA_CONF" 2>/dev/null; then
-            wpa_supplicant -B -i "$WLAN_IF" -c "$WPA_CONF" -P "$WPA_PID"
-            log_msg "wpa_supplicant started on $WLAN_IF"
+    iw reg set AU 2>/dev/null
+    sleep 1  # Let reg domain propagate
+    _regdom=$(iw reg get 2>/dev/null | head -n 1)
+    log_msg "Regulatory domain: $_regdom"
 
-            # Request DHCP on STA interface
-            udhcpc -i "$WLAN_IF" -p /var/run/udhcpc_wlan0.pid -b -q 2>/dev/null &
-            log_msg "DHCP client requested on $WLAN_IF"
-        else
-            log_msg "WARN: No networks configured in $WPA_CONF, STA not started"
-        fi
-    else
-        log_msg "WARN: $WPA_CONF not found, STA not started"
-    fi
-
-    # --- Bring up AP ---
-    ip link set "$AP_IF" up
-    ip addr add "${AP_IP}/24" dev "$AP_IF" 2>/dev/null
-
-    if [ -f "$HOSTAPD_CONF" ]; then
-        hostapd -B -P "$HOSTAPD_PID" "$HOSTAPD_CONF"
-        if [ $? -eq 0 ]; then
-            log_msg "hostapd started on $AP_IF"
-        else
-            log_msg "ERROR: hostapd failed to start"
-            return 1
-        fi
-    else
+    # --- Step 5: Assign AP IP and start hostapd ---
+    if [ ! -f "$HOSTAPD_CONF" ]; then
         log_msg "ERROR: $HOSTAPD_CONF not found"
         return 1
     fi
 
-    # --- Start DHCP server for AP clients ---
+    ip addr flush dev "$WLAN_IF" 2>/dev/null
+    ip addr add "${AP_IP}/24" dev "$WLAN_IF" 2>/dev/null
+
+    hostapd -B -P "$HOSTAPD_PID" "$HOSTAPD_CONF"
+    if [ $? -eq 0 ]; then
+        log_msg "hostapd started on $WLAN_IF"
+    else
+        log_msg "ERROR: hostapd failed to start"
+        log_msg "hostapd config: $(grep -v '^#' "$HOSTAPD_CONF" | grep -v '^$' | tr '\n' ' ')"
+        return 1
+    fi
+
+    # --- Step 6: Start DHCP/captive-portal server for AP clients ---
     if [ -f "$DNSMASQ_CONF" ]; then
-        dnsmasq --conf-file="$DNSMASQ_CONF" --pid-file="$DNSMASQ_PID"
-        log_msg "dnsmasq DHCP server started for $AP_IF"
+        # Stop the stock system dnsmasq — it binds to 0.0.0.0:53 (wildcard)
+        # which prevents our AP dnsmasq from binding to 192.168.4.1:53.
+        # Use killall because BusyBox lacks start-stop-daemon.
+        if killall dnsmasq 2>/dev/null; then
+            sleep 1
+            log_msg "Stopped stock dnsmasq to free port 53"
+        fi
+
+        # Update dnsmasq config interface to match actual interface name
+        _runtime_dnsmasq="/var/run/dnsmasq-ap0.runtime.conf"
+        sed "s/^interface=.*/interface=$WLAN_IF/" "$DNSMASQ_CONF" > "$_runtime_dnsmasq"
+        dnsmasq --conf-file="$_runtime_dnsmasq" --pid-file="$DNSMASQ_PID"
+        if [ $? -eq 0 ]; then
+            log_msg "dnsmasq DHCP/captive-portal started for $WLAN_IF"
+        else
+            log_msg "WARN: dnsmasq failed to start"
+        fi
     else
         log_msg "WARN: $DNSMASQ_CONF not found, AP clients won't get DHCP"
     fi
 
-    # --- Enable IP forwarding and NAT (STA → AP routing) ---
-    echo 1 > /proc/sys/net/ipv4/ip_forward
-    iptables -t nat -C POSTROUTING -o "$WLAN_IF" -j MASQUERADE 2>/dev/null || \
-        iptables -t nat -A POSTROUTING -o "$WLAN_IF" -j MASQUERADE
-    iptables -C FORWARD -i "$AP_IF" -o "$WLAN_IF" -j ACCEPT 2>/dev/null || \
-        iptables -A FORWARD -i "$AP_IF" -o "$WLAN_IF" -j ACCEPT
-    iptables -C FORWARD -i "$WLAN_IF" -o "$AP_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
-        iptables -A FORWARD -i "$WLAN_IF" -o "$AP_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT
-    log_msg "NAT/forwarding enabled between $AP_IF and $WLAN_IF"
-
-    log_msg "AP+STA mode started successfully"
+    log_msg "WiFi AP mode started successfully"
     return 0
 }
 
+# -----------------------------------------------------------------------
+# STOP
+# -----------------------------------------------------------------------
 do_stop() {
-    log_msg "Stopping AP+STA mode"
-
-    # Remove NAT rules
-    iptables -t nat -D POSTROUTING -o "$WLAN_IF" -j MASQUERADE 2>/dev/null
-    iptables -D FORWARD -i "$AP_IF" -o "$WLAN_IF" -j ACCEPT 2>/dev/null
-    iptables -D FORWARD -i "$WLAN_IF" -o "$AP_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null
+    log_msg "Stopping WiFi AP mode"
 
     # Stop dnsmasq
     if [ -f "$DNSMASQ_PID" ]; then
@@ -211,35 +282,21 @@ do_stop() {
         log_msg "hostapd stopped"
     fi
 
-    # Stop wpa_supplicant
-    if [ -f "$WPA_PID" ]; then
-        kill "$(cat "$WPA_PID")" 2>/dev/null
-        rm -f "$WPA_PID"
-        log_msg "wpa_supplicant stopped"
-    fi
-
-    # Kill DHCP client
-    if [ -f /var/run/udhcpc_wlan0.pid ]; then
-        kill "$(cat /var/run/udhcpc_wlan0.pid)" 2>/dev/null
-        rm -f /var/run/udhcpc_wlan0.pid
-    fi
-
-    # Remove AP interface
-    if [ -d "/sys/class/net/$AP_IF" ]; then
-        ip link set "$AP_IF" down 2>/dev/null
-        iw dev "$AP_IF" del 2>/dev/null
-        log_msg "Removed $AP_IF"
-    fi
-
-    # Bring down STA
+    # Bring down interface
     ip link set "$WLAN_IF" down 2>/dev/null
 
-    log_msg "AP+STA mode stopped"
+    # Clean up runtime configs
+    rm -f /var/run/dnsmasq-ap0.runtime.conf
+
+    log_msg "WiFi AP mode stopped"
     return 0
 }
 
+# -----------------------------------------------------------------------
+# STATUS
+# -----------------------------------------------------------------------
 do_status() {
-    echo "=== WiFi AP+STA Status ==="
+    echo "=== WiFi AP Status ==="
     MT76_PHY=$(find_mt76_phy)
     if [ -z "$MT76_PHY" ]; then
         echo "MT7612U: NOT DETECTED"
@@ -247,28 +304,30 @@ do_status() {
     fi
     echo "MT7612U phy: $MT76_PHY"
 
-    if [ -d "/sys/class/net/$WLAN_IF" ]; then
-        echo "STA ($WLAN_IF): UP"
-        ip addr show "$WLAN_IF" 2>/dev/null | grep "inet "
-        if [ -f "$WPA_PID" ] && kill -0 "$(cat "$WPA_PID")" 2>/dev/null; then
-            echo "wpa_supplicant: RUNNING"
-        else
-            echo "wpa_supplicant: STOPPED"
-        fi
-    else
-        echo "STA ($WLAN_IF): DOWN"
-    fi
+    # Check disable_usb_sg parameter
+    _sg_status=$(cat /sys/module/mt76_usb/parameters/disable_usb_sg 2>/dev/null)
+    echo "USB SG disabled: ${_sg_status:-unknown}"
 
-    if [ -d "/sys/class/net/$AP_IF" ]; then
-        echo "AP ($AP_IF): UP"
-        ip addr show "$AP_IF" 2>/dev/null | grep "inet "
+    # Regulatory domain
+    echo "Regulatory: $(iw reg get 2>/dev/null | head -n 1)"
+
+    if [ -d "/sys/class/net/$WLAN_IF" ]; then
+        echo "AP ($WLAN_IF): UP"
+        echo "AP MAC: $(cat /sys/class/net/$WLAN_IF/address 2>/dev/null)"
+        ip addr show "$WLAN_IF" 2>/dev/null | grep "inet "
         if [ -f "$HOSTAPD_PID" ] && kill -0 "$(cat "$HOSTAPD_PID")" 2>/dev/null; then
             echo "hostapd: RUNNING"
+            # Show connected stations
+            _sta_count=0
+            if [ -S /var/run/hostapd/"$WLAN_IF" ]; then
+                _sta_count=$(hostapd_cli -i "$WLAN_IF" list_sta 2>/dev/null | grep -c "^[0-9a-f]")
+            fi
+            echo "Connected stations: $_sta_count"
         else
             echo "hostapd: STOPPED"
         fi
     else
-        echo "AP ($AP_IF): DOWN"
+        echo "AP ($WLAN_IF): DOWN"
     fi
 
     if [ -f "$DNSMASQ_PID" ] && kill -0 "$(cat "$DNSMASQ_PID")" 2>/dev/null; then
@@ -287,7 +346,7 @@ case "$1" in
         ;;
     restart)
         do_stop
-        sleep 1
+        sleep 2
         do_start
         ;;
     status)
