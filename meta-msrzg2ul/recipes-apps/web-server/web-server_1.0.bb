@@ -94,6 +94,12 @@ SYSTEMD_AUTO_ENABLE = "enable"
 
 # Do NOT list ${sysconfdir}/ae400 here — can-gateway owns that directory.
 # Only list concrete files we install.
+#
+# DIRFILES limits which directories this package %dir-owns — without this
+# the RPM spec auto-claims every parent directory (including /etc/init.d,
+# /var/lib) which collides with sysvinit/iproute2 during do_rootfs.
+DIRFILES = "/var/lib/ae400-webserver /var/www /usr/share/ae400 /usr/share/ae400/config /usr/share/ae400/config/schema /usr/share/ae400/aspectmon"
+
 FILES:${PN} += "${bindir}/ae400-webserver \
                 ${sysconfdir}/init.d/ae400-webserver \
                 /var/www \

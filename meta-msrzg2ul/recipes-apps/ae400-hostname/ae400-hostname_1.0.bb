@@ -43,6 +43,9 @@ do_install() {
 SYSTEMD_SERVICE:${PN} = "ae400-hostname.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
+# Prevent %dir ownership of shared system dirs (/etc/init.d).
+DIRFILES = ""
+
 FILES:${PN} += " \
     ${bindir}/ae400-set-hostname \
     ${sysconfdir}/init.d/ae400-hostname \

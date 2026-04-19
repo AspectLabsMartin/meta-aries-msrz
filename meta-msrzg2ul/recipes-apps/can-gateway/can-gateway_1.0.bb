@@ -62,6 +62,11 @@ SYSTEMD_AUTO_ENABLE = "enable"
 
 RDEPENDS:${PN} = "bash alsa-utils"
 
+# Prevent RPM %dir ownership of shared system directories (/etc/init.d,
+# /etc/modprobe.d, etc.).  Without this, cleansstate rebuilds trigger
+# "file /etc/init.d conflicts between attempted installs" at do_rootfs.
+DIRFILES = "${sysconfdir}/ae400 ${sysconfdir}/ae400/sounds"
+
 FILES:${PN} += "${bindir}/ae400 \
                 ${sysconfdir}/ae400 \
                 ${sysconfdir}/init.d/ae400 \

@@ -11,8 +11,11 @@ EXTERNALSRC_BUILD = "${EXTERNALSRC}"
 S = "${EXTERNALSRC}"
 B = "${S}"
 
-# Runtime dependencies - needs can-flash-tool for DSP updates
-RDEPENDS:${PN} = "can-flash-tool"
+# Build-time dependencies - OpenSSL for bundle signing/encryption (Ed25519, X25519, AES-256-GCM)
+DEPENDS += "openssl"
+
+# Runtime dependencies - needs can-flash-tool for DSP updates, openssl for libcrypto
+RDEPENDS:${PN} = "can-flash-tool libcrypto"
 
 # Init script configuration
 INITSCRIPT_NAME = "firmware-update-service"
@@ -39,11 +42,14 @@ do_install() {
 # Package the daemon, library, headers, init script, and storage dirs
 FILES:${PN} = " \
     ${bindir}/firmware-update-service \
+    ${bindir}/bundle-crypt \
     ${sysconfdir}/init.d/firmware-update-service \
     ${sysconfdir}/ae400/firmware-signing-key.pub \
     /usr/share/sounds/system-update-started.wav \
     /usr/share/sounds/system-update-aborted.wav \
     /usr/share/sounds/system-update-finished.wav \
+    /usr/share/sounds/card-mismatch.wav \
+    /usr/share/sounds/system-file-mismatch.wav \
     /var/lib/firmware-updates \
     /var/lib/firmware-updates/history \
 "

@@ -52,6 +52,10 @@ CONFFILES_${PN} = " \
     ${sysconfdir}/modprobe.d/mt76-usb.conf \
 "
 
+# Prevent %dir ownership of shared system dirs (/etc, /etc/init.d,
+# /etc/modprobe.d) which collides with sysvinit/kmod during do_rootfs.
+DIRFILES = ""
+
 FILES_${PN} = " \
     ${sysconfdir}/init.d/wifi-apsta \
     ${sysconfdir}/hostapd-ap0.conf \
