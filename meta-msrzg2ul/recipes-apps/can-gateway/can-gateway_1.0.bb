@@ -45,6 +45,8 @@ do_install() {
     install -m 0644 ${S}/../support-files/poweron.wav ${D}${sysconfdir}/ae400/sounds/poweron.wav
     install -m 0644 ${S}/../support-files/poweroff.wav ${D}${sysconfdir}/ae400/sounds/poweroff.wav
     install -m 0644 ${S}/../support-files/Cannotpoweroncheckbreaker.wav ${D}${sysconfdir}/ae400/sounds/Cannotpoweroncheckbreaker.wav
+    # AIT-11: system-fault (trip-active power-on refused) chime
+    install -m 0644 ${S}/../support-files/SystemFaultCannotPowerOn.wav ${D}${sysconfdir}/ae400/sounds/SystemFaultCannotPowerOn.wav
 
     # Install SysVinit script for auto-start at boot
     install -d ${D}${sysconfdir}/init.d

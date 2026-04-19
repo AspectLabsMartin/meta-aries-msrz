@@ -19,6 +19,7 @@ verify_ae400_required_artifacts() {
 /etc/ae400/sounds/poweron.wav
 /etc/ae400/sounds/poweroff.wav
 /etc/ae400/sounds/Cannotpoweroncheckbreaker.wav
+/etc/ae400/sounds/SystemFaultCannotPowerOn.wav
 /usr/share/ae400/config/schema/config_user.schema.json
 /usr/share/sounds/system-update-started.wav
 /usr/share/sounds/system-update-aborted.wav
