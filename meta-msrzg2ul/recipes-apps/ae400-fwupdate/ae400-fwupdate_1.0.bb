@@ -14,6 +14,8 @@ B = "${S}"
 # Build-time dependencies - OpenSSL for bundle signing/encryption (Ed25519, X25519, AES-256-GCM)
 DEPENDS += "openssl"
 
+AE400_IMAGE_EMBEDDED_BUNDLE ?= "${TOPDIR}/../build/firmware-packages/dsp-application/latest.tar.gz"
+
 # Runtime dependencies - needs can-flash-tool for DSP updates, openssl for libcrypto
 RDEPENDS:${PN} = "can-flash-tool libcrypto"
 
@@ -36,7 +38,30 @@ do_compile() {
 }
 
 do_install() {
+    SIGNING_PUBKEY="${TOPDIR}/../config/security/firmware-signing-key.pub"
+    ENCRYPTION_PRIVKEY="${TOPDIR}/../config/security/firmware-encryption-key.pem"
+    ENCRYPTION_PUBKEY="${TOPDIR}/../config/security/firmware-encryption-key.pub"
+
+    if [ ! -f "${SIGNING_PUBKEY}" ]; then
+        bbfatal "Signing public key missing: ${SIGNING_PUBKEY}"
+    fi
+
+    if [ ! -f "${ENCRYPTION_PRIVKEY}" ]; then
+        bbfatal "Encryption private key missing: ${ENCRYPTION_PRIVKEY}"
+    fi
+
+    if [ ! -f "${ENCRYPTION_PUBKEY}" ]; then
+        bbfatal "Encryption public key missing: ${ENCRYPTION_PUBKEY}"
+    fi
+
     oe_runmake install DESTDIR=${D}
+
+    if [ ! -f "${AE400_IMAGE_EMBEDDED_BUNDLE}" ]; then
+        bbfatal "Embedded firmware bundle missing: ${AE400_IMAGE_EMBEDDED_BUNDLE}"
+    fi
+
+    install -d ${D}/usr/share/ae400/embedded-bundles
+    install -m 0644 "${AE400_IMAGE_EMBEDDED_BUNDLE}" ${D}/usr/share/ae400/embedded-bundles/image-default.tar.gz
 }
 
 # Package the daemon, library, headers, init script, and storage dirs
@@ -45,6 +70,9 @@ FILES:${PN} = " \
     ${bindir}/bundle-crypt \
     ${sysconfdir}/init.d/firmware-update-service \
     ${sysconfdir}/ae400/firmware-signing-key.pub \
+    ${sysconfdir}/ae400/firmware-encryption-key.pem \
+    ${sysconfdir}/ae400/firmware-encryption-key.pub \
+    /usr/share/ae400/embedded-bundles/image-default.tar.gz \
     /usr/share/sounds/system-update-started.wav \
     /usr/share/sounds/system-update-aborted.wav \
     /usr/share/sounds/system-update-finished.wav \
