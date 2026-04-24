@@ -87,6 +87,21 @@ do_install() {
     # Install sysvinit script (for non-systemd systems)
     install -d ${D}${sysconfdir}/init.d
     install -m 0755 ${EXTERNALSRC}/init.d/server.sh ${D}${sysconfdir}/init.d/ae400-webserver
+
+    # Portable configuration signing keypair (AIT-59)
+    # Private key: mode 0640, group ae400web so the web server can sign
+    # exports after privilege drop. Public key: world-readable.
+    CONFIG_SIGNING_PRIVKEY="${TOPDIR}/../config/security/config-signing-key.pem"
+    CONFIG_SIGNING_PUBKEY="${TOPDIR}/../config/security/config-signing-key.pub"
+    if [ ! -f "$CONFIG_SIGNING_PRIVKEY" ]; then
+        bbfatal "Portable config signing private key missing: $CONFIG_SIGNING_PRIVKEY"
+    fi
+    if [ ! -f "$CONFIG_SIGNING_PUBKEY" ]; then
+        bbfatal "Portable config signing public key missing: $CONFIG_SIGNING_PUBKEY"
+    fi
+    install -d ${D}${sysconfdir}/ae400
+    install -m 0640 "$CONFIG_SIGNING_PRIVKEY" ${D}${sysconfdir}/ae400/config-signing-key
+    install -m 0644 "$CONFIG_SIGNING_PUBKEY" ${D}${sysconfdir}/ae400/config-signing-key.pub
 }
 
 SYSTEMD_SERVICE:${PN} = "ae400-webserver.service"
@@ -102,6 +117,8 @@ DIRFILES = "/var/lib/ae400-webserver /var/www /usr/share/ae400 /usr/share/ae400/
 
 FILES:${PN} += "${bindir}/ae400-webserver \
                 ${sysconfdir}/init.d/ae400-webserver \
+                ${sysconfdir}/ae400/config-signing-key \
+                ${sysconfdir}/ae400/config-signing-key.pub \
                 /var/www \
                 /var/lib/ae400-webserver \
                 /var/lib/database-logger/spool/config-archive \
@@ -119,5 +136,14 @@ pkg_postinst:${PN}() {
     fi
     if [ -f $D${sysconfdir}/ae400/config_user.json ]; then
         chown ae400web:ae400web $D${sysconfdir}/ae400/config_user.json
+    fi
+    # Portable config signing private key: group-readable by ae400web.
+    if [ -f $D${sysconfdir}/ae400/config-signing-key ]; then
+        chown root:ae400web $D${sysconfdir}/ae400/config-signing-key
+        chmod 0640 $D${sysconfdir}/ae400/config-signing-key
+    fi
+    if [ -f $D${sysconfdir}/ae400/config-signing-key.pub ]; then
+        chown root:root $D${sysconfdir}/ae400/config-signing-key.pub
+        chmod 0644 $D${sysconfdir}/ae400/config-signing-key.pub
     fi
 }
