@@ -1,4 +1,5 @@
 SUMMARY = "USB Headless Firmware Update Service"
+PR = "r3"
 DESCRIPTION = "Monitors USB mounts for firmware bundles and triggers automatic updates"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=10;md5=65812394c7f2117c5abd2b63bf7a9dec"

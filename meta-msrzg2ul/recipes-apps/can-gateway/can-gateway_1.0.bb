@@ -1,9 +1,17 @@
 SUMMARY = "CAN Gateway application (SocketCAN-based)"
+PR = "r7"
 DESCRIPTION = "Routes and maps CAN messages across two buses with configuration files."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=71b74b9ff2ff69bff6e64bfd04d99717"
 
-inherit externalsrc systemd update-rc.d
+# Note: do NOT inherit update-rc.d. This service is started exclusively by
+# firmware-update-service after the startup-compliance boot gate passes
+# (see sc_start_managed_services in applications/firmware-update-service).
+# Auto-starting via SysVinit would race the gate and let can-gateway pump
+# CAN-A traffic during the DSP self-heal flash session, breaking PREPARE
+# response collection. The init.d script is still installed for fwupd to
+# invoke via /etc/init.d/ae400 start.
+inherit externalsrc systemd
 
 # Use the external source tree in this repo
 EXTERNALSRC = "${TOPDIR}/../applications/can-gateway/src"
@@ -12,10 +20,6 @@ S = "${EXTERNALSRC}"
 B = "${S}"
 
 SRC_URI = "file://ae400-can-gateway.service"
-
-# SysVinit configuration — start early (before web server at 90)
-INITSCRIPT_NAME = "ae400"
-INITSCRIPT_PARAMS = "defaults 85 15"
 
 # Ensure proper build environment
 DEPENDS = ""
@@ -47,6 +51,13 @@ do_install() {
     install -m 0644 ${S}/../support-files/Cannotpoweroncheckbreaker.wav ${D}${sysconfdir}/ae400/sounds/Cannotpoweroncheckbreaker.wav
     # AIT-11: system-fault (trip-active power-on refused) chime
     install -m 0644 ${S}/../support-files/SystemFaultCannotPowerOn.wav ${D}${sysconfdir}/ae400/sounds/SystemFaultCannotPowerOn.wav
+    # Install remaining support-files sounds so baseline rootfs matches the
+    # OTA `ae400-support` archive (avoids first-boot remediation drift).
+    install -m 0644 ${S}/../support-files/UnsupportedCardDetected.wav ${D}${sysconfdir}/ae400/sounds/UnsupportedCardDetected.wav
+    install -m 0644 ${S}/../support-files/UpdateAbortedSystemRunning.wav ${D}${sysconfdir}/ae400/sounds/UpdateAbortedSystemRunning.wav
+    install -m 0644 ${S}/../support-files/poweron_backup.wav ${D}${sysconfdir}/ae400/sounds/poweron_backup.wav
+    install -m 0644 ${S}/../support-files/poweroff_backup.wav ${D}${sysconfdir}/ae400/sounds/poweroff_backup.wav
+    install -m 0644 ${S}/../support-files/startup_backup.wav ${D}${sysconfdir}/ae400/sounds/startup_backup.wav
 
     # Install SysVinit script for auto-start at boot
     install -d ${D}${sysconfdir}/init.d

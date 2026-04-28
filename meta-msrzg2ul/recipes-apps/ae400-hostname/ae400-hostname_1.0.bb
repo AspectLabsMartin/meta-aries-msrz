@@ -1,4 +1,5 @@
 SUMMARY = "AE400 Hostname Configuration Service"
+PR = "r3"
 DESCRIPTION = "Sets the system hostname to AE400-{MAC-suffix} at boot so the \
 unit is uniquely identifiable in DHCP client lists (AIT-15)."
 LICENSE = "MIT"

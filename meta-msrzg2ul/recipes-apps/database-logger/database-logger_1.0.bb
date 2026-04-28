@@ -1,9 +1,14 @@
 SUMMARY = "AE400 Database Logger Service"
+PR = "r4"
 DESCRIPTION = "Daemon for logging operational events and telemetry data to SQLite databases"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://Makefile;beginline=1;endline=10;md5=f2211fcfa57fcdbdbf88f58e06b25dc7"
 
-inherit externalsrc update-rc.d
+# Note: do NOT inherit update-rc.d. This service is started exclusively by
+# firmware-update-service after the startup-compliance boot gate passes
+# (sc_start_managed_services). The init.d script is still installed so
+# fwupd can invoke /etc/init.d/database-logger start.
+inherit externalsrc
 
 # Use the external source tree in this repo
 EXTERNALSRC = "${TOPDIR}/../applications/database-logger"
@@ -16,10 +21,6 @@ DEPENDS = "sqlite3"
 
 # Runtime dependencies - need sqlite3 shared library on target
 RDEPENDS:${PN} = "sqlite3"
-
-# Init script configuration - start before other services that emit events
-INITSCRIPT_NAME = "database-logger"
-INITSCRIPT_PARAMS = "defaults 80 20"
 
 # Prevent RPM directory ownership conflicts with base-system packages
 DIRFILES = "/var/lib/database-logger /var/lib/database-logger/spool /etc/database-logger /etc/ae400/config_registry.d"

@@ -1,4 +1,5 @@
 SUMMARY = "CAN Flash Tool for DSP firmware updates"
+PR = "r3"
 DESCRIPTION = "Flash encrypted firmware images to TMS320F280049 DSP via CAN bootloader protocol."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=a132bff7f95da09c8a8ecfefd4ebe389"

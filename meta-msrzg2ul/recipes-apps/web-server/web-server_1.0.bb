@@ -1,8 +1,13 @@
 SUMMARY = "AE400 Inverter Web Server"
+PR = "r6"
 DESCRIPTION = "Single-threaded embedded HTTP server for AE400 inverter system with UI"
 LICENSE = "CLOSED"
 
-inherit externalsrc systemd update-rc.d useradd
+# Note: do NOT inherit update-rc.d. This service is started exclusively by
+# firmware-update-service after the startup-compliance boot gate passes
+# (sc_start_managed_services), or in diagnostic-only mode via
+# sc_start_diagnostic_ui when the gate is BLOCK_DIAGNOSTIC.
+inherit externalsrc systemd useradd
 
 # Use the external source tree in this repo
 EXTERNALSRC = "${TOPDIR}/../applications/web-server/src/server"
@@ -11,10 +16,6 @@ S = "${EXTERNALSRC}"
 B = "${S}"
 
 SRC_URI = "file://ae400-webserver.service"
-
-# SysVinit configuration
-INITSCRIPT_NAME = "ae400-webserver"
-INITSCRIPT_PARAMS = "defaults 90 10"
 
 # Ensure proper build environment
 DEPENDS = "sqlite3 openssl"

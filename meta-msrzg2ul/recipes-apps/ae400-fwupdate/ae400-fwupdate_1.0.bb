@@ -1,4 +1,5 @@
 SUMMARY = "AE400 Firmware Update Service"
+PR = "r7"
 DESCRIPTION = "Daemon for orchestrating DSP and system firmware updates via CAN transport and IPC"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=9cc280e9f7a3d249c321e9b15d304035"
