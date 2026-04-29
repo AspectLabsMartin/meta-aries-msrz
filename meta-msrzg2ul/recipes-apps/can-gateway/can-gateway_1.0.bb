@@ -51,6 +51,8 @@ do_install() {
     install -m 0644 ${S}/../support-files/Cannotpoweroncheckbreaker.wav ${D}${sysconfdir}/ae400/sounds/Cannotpoweroncheckbreaker.wav
     # AIT-11: system-fault (trip-active power-on refused) chime
     install -m 0644 ${S}/../support-files/SystemFaultCannotPowerOn.wav ${D}${sysconfdir}/ae400/sounds/SystemFaultCannotPowerOn.wav
+    # AIT-60: BMS-disconnected warning chime
+    install -m 0644 ${S}/../support-files/BMSDisconnected.wav ${D}${sysconfdir}/ae400/sounds/BMSDisconnected.wav
     # Install remaining support-files sounds so baseline rootfs matches the
     # OTA `ae400-support` archive (avoids first-boot remediation drift).
     install -m 0644 ${S}/../support-files/UnsupportedCardDetected.wav ${D}${sysconfdir}/ae400/sounds/UnsupportedCardDetected.wav
