@@ -2,7 +2,7 @@ SUMMARY = "CAN Gateway application (SocketCAN-based)"
 PR = "r7"
 DESCRIPTION = "Routes and maps CAN messages across two buses with configuration files."
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=71b74b9ff2ff69bff6e64bfd04d99717"
+LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=3094a402ce8b402897de2e473744488a"
 
 # Note: do NOT inherit update-rc.d. This service is started exclusively by
 # firmware-update-service after the startup-compliance boot gate passes
