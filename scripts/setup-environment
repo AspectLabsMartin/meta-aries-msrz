@@ -24,6 +24,13 @@
 CWD=`pwd`
 PROGNAME="setup-environment"
 
+if [ -x "$CWD/scripts/bootstrap-yocto-sources.sh" ] && \
+   ! "$CWD/scripts/bootstrap-yocto-sources.sh" --check; then
+    echo "ERROR: required Yocto sources are missing or not initialized."
+    echo "Run: scripts/bootstrap-yocto-sources.sh --sync"
+    exit 1
+fi
+
 # look for supported machine templates
 LIST_MACHINES=`find sources -wholename '*meta-aries-msrz/docs/template/conf/*' -type d`
 

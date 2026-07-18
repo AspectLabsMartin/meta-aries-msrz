@@ -26,6 +26,13 @@ PATH=$PATH:$PWD
 # load build environment if present
 [ ! -f "$BUILDENV" ] || . $BUILDENV
 
+if [ -x "$PWD/scripts/bootstrap-yocto-sources.sh" ] && \
+   ! "$PWD/scripts/bootstrap-yocto-sources.sh" --check; then
+	echo "ERROR: required Yocto sources are missing or not initialized."
+	echo "Run: scripts/bootstrap-yocto-sources.sh --sync"
+	exit 1
+fi
+
 usage() {
 	echo
 	echo "Docker Build Environment Helper Script"
@@ -117,14 +124,23 @@ run_docker() {
 	ODIR="--volume $(realpath $OUTPUT_DIR):/opt/deploy"
 
 	# Detect if running with TTY
+	#
+	# When invoked from an AI agent / CI / pipe, stdin or stdout is not a tty.
+	# Allocating `-t` in that case can cause docker to leave the container
+	# waiting on a pseudo-tty that never gets EOF, which manifests as the host
+	# wrapper hanging indefinitely after a build failure. Only request a tty
+	# when BOTH stdin and stdout are real ttys.
 	if [ -t 0 ] && [ -t 1 ]; then
 		TTY_FLAG="-it"
 	else
 		TTY_FLAG="-i"
 	fi
 
-	# run container
+	# run container; propagate the container's exit code to the caller so
+	# build failures are visible to automation. NEVER fall through to an
+	# interactive shell on failure.
 	docker run --rm $TTY_FLAG $WDIR $DDIR $ODIR -e BUILDENV=$BUILDENV $DOCKERNAME "$@"
+	return $?
 }
 
 ARGS=$(getopt -q --options $SHORTOPTS --name $PROGNAME -- "$@")
@@ -248,4 +264,20 @@ fi
 [ ! -f $BUILD_DIR/conf/site.conf.docker_tmp ] || mv $BUILD_DIR/conf/site.conf.docker_tmp $BUILD_DIR/conf/site.conf
 
 # run docker
-[ $# -gt 0 ] && run_docker -c "$*" || run_docker
+#
+# IMPORTANT: do NOT use the `cmd1 && cmd2 || cmd3` idiom here. If the inner
+# build command (e.g. `bitbake foo`) exits non-zero, that pattern would fall
+# through to the bare `run_docker` branch and spawn an interactive shell
+# (`bash -i`) inside the container. That leaves automation / AI agents stuck
+# at an `aspect@(docker)$` prompt waiting for a human to type `exit` before
+# the host-side wrapper can return. Always branch with a real `if/else` and
+# propagate the container exit code verbatim so callers (and CI) see the
+# real failure.
+if [ $# -gt 0 ]; then
+	run_docker -c "$*"
+	rc=$?
+else
+	run_docker
+	rc=$?
+fi
+exit $rc

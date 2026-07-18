@@ -1,5 +1,5 @@
 SUMMARY = "AE400 Firmware Update Service"
-PR = "r7"
+PR = "r8"
 DESCRIPTION = "Daemon for orchestrating DSP and system firmware updates via CAN transport and IPC"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=9cc280e9f7a3d249c321e9b15d304035"
@@ -74,6 +74,7 @@ FILES:${PN} = " \
     ${sysconfdir}/ae400/firmware-encryption-key.pem \
     ${sysconfdir}/ae400/firmware-encryption-key.pub \
     /usr/share/ae400/embedded-bundles/image-default.tar.gz \
+    /usr/share/sounds/AE400StartingUp.wav \
     /usr/share/sounds/system-update-started.wav \
     /usr/share/sounds/system-update-aborted.wav \
     /usr/share/sounds/system-update-finished.wav \

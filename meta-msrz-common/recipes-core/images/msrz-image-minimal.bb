@@ -36,6 +36,13 @@ fix_ae400_ownership() {
     local etc_ae400="${IMAGE_ROOTFS}${sysconfdir}/ae400"
 
     if [ -d "${etc_ae400}" ]; then
+        # Factory image must not ship a pre-seeded auth database.
+        # The web-server bootstraps /etc/ae400/users.json on first boot.
+        if [ -f "${etc_ae400}/users.json" ]; then
+            bbwarn "fix_ae400_ownership: removing pre-seeded /etc/ae400/users.json from image"
+            rm -f "${etc_ae400}/users.json"
+        fi
+
         # Directory: root:ae400web 0775 so ae400web can create tmp/bak files
         # for atomic writes (configuration save, archive, etc.)
         chown 0:${ae400web_gid} "${etc_ae400}"
@@ -154,6 +161,14 @@ verify_ae400_required_artifacts() {
 /etc/ae400/sounds/Cannotpoweroncheckbreaker.wav
 /etc/ae400/sounds/SystemFaultCannotPowerOn.wav
 /etc/ae400/sounds/BMSDisconnected.wav
+/etc/ae400/sounds/breaker_open.wav
+/etc/ae400/sounds/system_fault.wav
+/etc/ae400/sounds/bms_disconnected.wav
+/etc/ae400/sounds/ae400_status.wav
+/etc/ae400/sounds/connected.wav
+/etc/ae400/sounds/island.wav
+/etc/ae400/sounds/passthrough.wav
+/etc/ae400/sounds/off.wav
 /usr/share/ae400/config/schema/config_user.schema.json
 /usr/share/ae400/embedded-bundles/image-default.tar.gz
 /usr/share/sounds/system-update-started.wav
@@ -167,6 +182,10 @@ EOF
             bbfatal "Missing required AE400 image artifact: ${relpath}"
         fi
     done < "${manifest_file}"
+
+    if [ -e "${IMAGE_ROOTFS}${sysconfdir}/ae400/users.json" ]; then
+        bbfatal "Factory image must not contain /etc/ae400/users.json; bootstrap creates it on first boot"
+    fi
 
     # Ownership regression guard: /etc/ae400 MUST NOT be owned by a host uid.
     # After fix_ae400_ownership runs, the directory must be root-owned with

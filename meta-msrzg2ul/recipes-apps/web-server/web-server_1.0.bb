@@ -1,5 +1,5 @@
 SUMMARY = "AE400 Inverter Web Server"
-PR = "r6"
+PR = "r7"
 DESCRIPTION = "Single-threaded embedded HTTP server for AE400 inverter system with UI"
 LICENSE = "CLOSED"
 
@@ -54,16 +54,17 @@ do_install() {
             ${D}/usr/share/ae400/config/schema/config_user.schema.json
     fi
 
-    # Install AspectMon variable map definition
+    # Install AspectMon symbol table for the web UI.
+    # Fail closed if it is missing: shipping an image without symbols.json (or
+    # with a stale one) silently breaks AspectMon variable resolution. The table
+    # is regenerated and provenance-verified against the DSP binary earlier in
+    # the SD-image build (build-sd-image-full.sh step 5b).
     install -d ${D}/usr/share/ae400/aspectmon
-    if [ -f ${TOPDIR}/../config/aspectmon/varmap_default.json ]; then
-        install -m 0644 ${TOPDIR}/../config/aspectmon/varmap_default.json \
-            ${D}/usr/share/ae400/aspectmon/varmap_default.json
+    if [ ! -f ${TOPDIR}/../config/aspectmon/symbols.json ]; then
+        bbfatal "config/aspectmon/symbols.json missing — rebuild the DSP application (scripts/build-dsp.sh) to regenerate it before packaging web-server"
     fi
-    if [ -f ${TOPDIR}/../config/aspectmon/symbols.json ]; then
-        install -m 0644 ${TOPDIR}/../config/aspectmon/symbols.json \
-            ${D}/usr/share/ae400/aspectmon/symbols.json
-    fi
+    install -m 0644 ${TOPDIR}/../config/aspectmon/symbols.json \
+        ${D}/usr/share/ae400/aspectmon/symbols.json
 
     # Install web root directory (read-only for service)
     install -d ${D}/var/www

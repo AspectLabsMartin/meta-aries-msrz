@@ -10,6 +10,7 @@ SRC_URI = " \
     file://hostapd-ap0.conf \
     file://wpa_supplicant-wlan0.conf \
     file://dnsmasq-ap0.conf \
+    file://90-wifi-apsta-hotplug.rules \
     file://mt76-usb.conf \
 "
 
@@ -33,6 +34,11 @@ do_install() {
     # modprobe.d config: disable USB scatter-gather for mt76 stability
     install -d ${D}${sysconfdir}/modprobe.d
     install -m 0644 ${WORKDIR}/mt76-usb.conf ${D}${sysconfdir}/modprobe.d/mt76-usb.conf
+
+    # udev hotplug hook for WiFi dongle add/remove events
+    install -d ${D}${sysconfdir}/udev/rules.d
+    install -m 0644 ${WORKDIR}/90-wifi-apsta-hotplug.rules \
+        ${D}${sysconfdir}/udev/rules.d/90-wifi-apsta-hotplug.rules
 }
 
 RDEPENDS_${PN} = " \
@@ -50,6 +56,7 @@ CONFFILES_${PN} = " \
     ${sysconfdir}/wpa_supplicant-wlan0.conf \
     ${sysconfdir}/dnsmasq-ap0.conf \
     ${sysconfdir}/modprobe.d/mt76-usb.conf \
+    ${sysconfdir}/udev/rules.d/90-wifi-apsta-hotplug.rules \
 "
 
 # Prevent %dir ownership of shared system dirs (/etc, /etc/init.d,
@@ -62,4 +69,5 @@ FILES_${PN} = " \
     ${sysconfdir}/wpa_supplicant-wlan0.conf \
     ${sysconfdir}/dnsmasq-ap0.conf \
     ${sysconfdir}/modprobe.d/mt76-usb.conf \
+    ${sysconfdir}/udev/rules.d/90-wifi-apsta-hotplug.rules \
 "

@@ -15,6 +15,20 @@ SRC_URI_append = " file://wifi-usb.cfg"
 SRC_URI_append = " file://mt76-wifi.cfg"
 SRC_URI_append = " file://netfilter.cfg"
 
+# Add kernel config fragment for the RZ/G2UL hardware watchdog (/dev/watchdog)
+SRC_URI_append = " file://watchdog.cfg"
+
+# Add kernel config fragment for lockup/hang crash forensics + auto-recovery.
+# Enables the softlockup/hung-task/workqueue detectors and panic-on-oops so a
+# silent SOM freeze becomes a loud panic backtrace on the (off-board-logged)
+# serial console, followed by an auto-reboot. See crash-hardening.cfg header.
+SRC_URI_append = " file://crash-hardening.cfg"
+
+# EXPERIMENT (2026-07-12): disable PREEMPT_RT to test whether the silent hard
+# lockups are an RT-specific driver/lock issue. Flips only the preemption model
+# on the same branch/DTS for a clean single-variable soak. See nonrt-preempt.cfg.
+SRC_URI_append = " file://nonrt-preempt.cfg"
+
 do_configure_append() {
     if [ "${IS_RT_BSP}" = "1" ]; then
         # Copy ARIES device tree files to kernel source for RT build

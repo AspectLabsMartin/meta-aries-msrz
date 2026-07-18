@@ -52,6 +52,10 @@ HOSTAPD_CONF="/etc/hostapd-ap0.conf"
 DNSMASQ_CONF="/etc/dnsmasq-ap0.conf"
 HOSTAPD_PID="/var/run/hostapd_ap0.pid"
 DNSMASQ_PID="/var/run/dnsmasq_ap0.pid"
+HOSTAPD_RUNTIME_CONF="/var/run/hostapd-ap0.runtime.conf"
+DNSMASQ_RUNTIME_CONF="/var/run/dnsmasq-ap0.runtime.conf"
+LAST_IFACE_FILE="/var/run/wifi-apsta.iface"
+LOCK_DIR="/var/run/wifi-apsta.lock"
 
 # USB IDs for the MT7612U dongle
 USB_CDROM_VID="0e8d"
@@ -70,13 +74,155 @@ log_msg() {
     echo "$LOGPFX: $1"
 }
 
+# Lock acquisition timeout (seconds).  Must exceed the worst-case do_start
+# runtime: USB_SWITCH_TIMEOUT (10s) + IFACE_TIMEOUT (15s) + driver/regdom
+# settles (~10s) + hostapd/dnsmasq startup, with margin for slow USB enum.
+LOCK_TIMEOUT=120
+
+acquire_lock() {
+    _tries=0
+    while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+        _tries=$((_tries + 1))
+        if [ "$_tries" -ge "$LOCK_TIMEOUT" ]; then
+            log_msg "ERROR: timed out waiting for WiFi AP lock after ${LOCK_TIMEOUT}s"
+            return 1
+        fi
+        sleep 1
+    done
+    return 0
+}
+
+release_lock() {
+    rmdir "$LOCK_DIR" 2>/dev/null
+}
+
+pid_is_running() {
+    _pid_file="$1"
+    if [ ! -f "$_pid_file" ]; then
+        return 1
+    fi
+    _pid=$(cat "$_pid_file" 2>/dev/null)
+    if [ -z "$_pid" ]; then
+        return 1
+    fi
+    kill -0 "$_pid" 2>/dev/null
+}
+
+usb_cdrom_present() {
+    lsusb 2>/dev/null | grep -qi "${USB_CDROM_VID}:${USB_CDROM_PID}"
+}
+
+usb_wifi_present() {
+    lsusb 2>/dev/null | grep -qi "${USB_WIFI_VID}:${USB_WIFI_PID}"
+}
+
+wifi_device_present() {
+    usb_cdrom_present || usb_wifi_present
+}
+
+get_active_iface() {
+    if [ -f "$LAST_IFACE_FILE" ]; then
+        _saved_iface=$(cat "$LAST_IFACE_FILE" 2>/dev/null)
+        if [ -n "$_saved_iface" ] && [ -d "/sys/class/net/$_saved_iface" ]; then
+            echo "$_saved_iface"
+            return 0
+        fi
+    fi
+
+    if [ -d "/sys/class/net/$WLAN_IF" ]; then
+        echo "$WLAN_IF"
+        return 0
+    fi
+
+    _phy=$(find_mt76_phy)
+    if [ -n "$_phy" ]; then
+        _iface=$(find_mt76_iface "$_phy")
+        if [ -n "$_iface" ]; then
+            echo "$_iface"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+write_runtime_configs() {
+    _iface="$1"
+
+    sed "s/^interface=.*/interface=$_iface/" "$HOSTAPD_CONF" > "$HOSTAPD_RUNTIME_CONF"
+
+    if [ -f "$DNSMASQ_CONF" ]; then
+        sed "s/^interface=.*/interface=$_iface/" "$DNSMASQ_CONF" > "$DNSMASQ_RUNTIME_CONF"
+    else
+        rm -f "$DNSMASQ_RUNTIME_CONF"
+    fi
+}
+
+stop_pid_file() {
+    _pid_file="$1"
+    _label="$2"
+
+    if [ ! -f "$_pid_file" ]; then
+        return 0
+    fi
+
+    _pid=$(cat "$_pid_file" 2>/dev/null)
+    if [ -z "$_pid" ]; then
+        rm -f "$_pid_file"
+        return 0
+    fi
+
+    # Polite SIGTERM first.
+    if kill "$_pid" 2>/dev/null; then
+        log_msg "$_label stop requested (pid $_pid)"
+    fi
+
+    # Wait up to 5s for graceful exit.
+    _wait=0
+    while [ "$_wait" -lt 5 ]; do
+        kill -0 "$_pid" 2>/dev/null || break
+        sleep 1
+        _wait=$((_wait + 1))
+    done
+
+    # Escalate to SIGKILL if still alive.
+    if kill -0 "$_pid" 2>/dev/null; then
+        log_msg "WARN: $_label (pid $_pid) ignored SIGTERM, sending SIGKILL"
+        kill -9 "$_pid" 2>/dev/null
+        sleep 1
+    fi
+
+    if kill -0 "$_pid" 2>/dev/null; then
+        log_msg "ERROR: $_label (pid $_pid) survived SIGKILL"
+    else
+        log_msg "$_label stopped"
+    fi
+
+    rm -f "$_pid_file"
+    return 0
+}
+
+cleanup_runtime_state() {
+    _active_iface=$(get_active_iface 2>/dev/null)
+
+    stop_pid_file "$DNSMASQ_PID" "dnsmasq"
+    stop_pid_file "$HOSTAPD_PID" "hostapd"
+
+    if [ -n "$_active_iface" ] && [ -d "/sys/class/net/$_active_iface" ]; then
+        ip addr flush dev "$_active_iface" 2>/dev/null
+        ip link set "$_active_iface" down 2>/dev/null
+    fi
+
+    rm -f "$HOSTAPD_RUNTIME_CONF" "$DNSMASQ_RUNTIME_CONF" "$LAST_IFACE_FILE"
+}
+
 # -----------------------------------------------------------------------
 # USB mode-switch: some MT7612U dongles present as a USB CD-ROM
 # (0e8d:2870) on first plug-in.  usb_modeswitch flips them to WiFi mode.
 # -----------------------------------------------------------------------
 do_usb_modeswitch() {
     # Check if dongle is in CD-ROM mode
-    if ! lsusb 2>/dev/null | grep -qi "${USB_CDROM_VID}:${USB_CDROM_PID}"; then
+    if ! usb_cdrom_present; then
         return 0  # Not in CD-ROM mode, nothing to do
     fi
     log_msg "MT7612U in CD-ROM mode (${USB_CDROM_VID}:${USB_CDROM_PID}), switching..."
@@ -97,7 +243,7 @@ do_usb_modeswitch() {
     # Wait for WiFi mode to appear
     _tries=0
     while [ "$_tries" -lt "$USB_SWITCH_TIMEOUT" ]; do
-        if lsusb 2>/dev/null | grep -qi "${USB_WIFI_VID}:${USB_WIFI_PID}"; then
+        if usb_wifi_present; then
             log_msg "USB mode-switch successful"
             sleep 1  # Let kernel enumerate the new device
             return 0
@@ -162,7 +308,13 @@ find_mt76_iface() {
 # START
 # -----------------------------------------------------------------------
 do_start() {
+    _device_present_before_start=0
+
     log_msg "Starting WiFi AP mode"
+
+    if wifi_device_present; then
+        _device_present_before_start=1
+    fi
 
     # --- Step 1: USB mode-switch if needed ---
     do_usb_modeswitch
@@ -182,7 +334,11 @@ do_start() {
         sleep 3
         MT76_PHY=$(find_mt76_phy)
         if [ -z "$MT76_PHY" ]; then
-            log_msg "ERROR: MT7612U not found (no mt76x2u phy)"
+            if [ "$_device_present_before_start" -eq 0 ] && ! wifi_device_present; then
+                log_msg "MT7612U not present, nothing to start"
+                return 0
+            fi
+            log_msg "ERROR: MT7612U present but no mt76x2u phy"
             return 1
         fi
     fi
@@ -202,11 +358,21 @@ do_start() {
         if [ $? -ne 0 ]; then
             log_msg "WARN: Could not rename $REAL_IF to $WLAN_IF, using $REAL_IF"
             WLAN_IF="$REAL_IF"
-            # Update hostapd config to use actual interface name
-            sed -i "s/^interface=.*/interface=$WLAN_IF/" "$HOSTAPD_CONF"
         fi
     fi
     log_msg "WiFi interface: $WLAN_IF"
+    echo "$WLAN_IF" > "$LAST_IFACE_FILE"
+
+    if pid_is_running "$HOSTAPD_PID" && pid_is_running "$DNSMASQ_PID"; then
+        log_msg "WiFi AP already running on $WLAN_IF"
+        return 0
+    fi
+
+    if [ -f "$HOSTAPD_PID" ] || [ -f "$DNSMASQ_PID" ] || \
+       [ -f "$HOSTAPD_RUNTIME_CONF" ] || [ -f "$DNSMASQ_RUNTIME_CONF" ]; then
+        log_msg "Cleaning partial WiFi AP state before start"
+        cleanup_runtime_state
+    fi
 
     # --- Step 4: Set regulatory domain ---
     # Must be done before any channel operations.  Requires
@@ -223,15 +389,22 @@ do_start() {
         return 1
     fi
 
+    if [ ! -f "$DNSMASQ_CONF" ]; then
+        log_msg "WARN: $DNSMASQ_CONF not found, AP clients won't get DHCP"
+    fi
+
+    write_runtime_configs "$WLAN_IF"
+
     ip addr flush dev "$WLAN_IF" 2>/dev/null
     ip addr add "${AP_IP}/24" dev "$WLAN_IF" 2>/dev/null
 
-    hostapd -B -P "$HOSTAPD_PID" "$HOSTAPD_CONF"
+    hostapd -B -P "$HOSTAPD_PID" "$HOSTAPD_RUNTIME_CONF"
     if [ $? -eq 0 ]; then
         log_msg "hostapd started on $WLAN_IF"
     else
         log_msg "ERROR: hostapd failed to start"
-        log_msg "hostapd config: $(grep -v '^#' "$HOSTAPD_CONF" | grep -v '^$' | tr '\n' ' ')"
+        log_msg "hostapd config: $(grep -v '^#' "$HOSTAPD_RUNTIME_CONF" | grep -v '^$' | tr '\n' ' ')"
+        cleanup_runtime_state
         return 1
     fi
 
@@ -245,21 +418,29 @@ do_start() {
             log_msg "Stopped stock dnsmasq to free port 53"
         fi
 
-        # Update dnsmasq config interface to match actual interface name
-        _runtime_dnsmasq="/var/run/dnsmasq-ap0.runtime.conf"
-        sed "s/^interface=.*/interface=$WLAN_IF/" "$DNSMASQ_CONF" > "$_runtime_dnsmasq"
-        dnsmasq --conf-file="$_runtime_dnsmasq" --pid-file="$DNSMASQ_PID"
+        dnsmasq --conf-file="$DNSMASQ_RUNTIME_CONF" --pid-file="$DNSMASQ_PID"
         if [ $? -eq 0 ]; then
             log_msg "dnsmasq DHCP/captive-portal started for $WLAN_IF"
         else
             log_msg "WARN: dnsmasq failed to start"
         fi
-    else
-        log_msg "WARN: $DNSMASQ_CONF not found, AP clients won't get DHCP"
     fi
 
     log_msg "WiFi AP mode started successfully"
     return 0
+}
+
+run_serialized() {
+    if ! acquire_lock; then
+        return 1
+    fi
+
+    trap 'release_lock' EXIT HUP INT TERM
+    "$@"
+    _status=$?
+    trap - EXIT HUP INT TERM
+    release_lock
+    return "$_status"
 }
 
 # -----------------------------------------------------------------------
@@ -268,28 +449,17 @@ do_start() {
 do_stop() {
     log_msg "Stopping WiFi AP mode"
 
-    # Stop dnsmasq
-    if [ -f "$DNSMASQ_PID" ]; then
-        kill "$(cat "$DNSMASQ_PID")" 2>/dev/null
-        rm -f "$DNSMASQ_PID"
-        log_msg "dnsmasq stopped"
-    fi
-
-    # Stop hostapd
-    if [ -f "$HOSTAPD_PID" ]; then
-        kill "$(cat "$HOSTAPD_PID")" 2>/dev/null
-        rm -f "$HOSTAPD_PID"
-        log_msg "hostapd stopped"
-    fi
-
-    # Bring down interface
-    ip link set "$WLAN_IF" down 2>/dev/null
-
-    # Clean up runtime configs
-    rm -f /var/run/dnsmasq-ap0.runtime.conf
+    cleanup_runtime_state
 
     log_msg "WiFi AP mode stopped"
     return 0
+}
+
+do_restart() {
+    do_stop
+    sleep 2
+    do_start
+    return $?
 }
 
 # -----------------------------------------------------------------------
@@ -300,7 +470,11 @@ do_status() {
     MT76_PHY=$(find_mt76_phy)
     if [ -z "$MT76_PHY" ]; then
         echo "MT7612U: NOT DETECTED"
-        return 1
+        if pid_is_running "$HOSTAPD_PID" || pid_is_running "$DNSMASQ_PID"; then
+            echo "Runtime state: STALE"
+            return 1
+        fi
+        return 0
     fi
     echo "MT7612U phy: $MT76_PHY"
 
@@ -311,23 +485,24 @@ do_status() {
     # Regulatory domain
     echo "Regulatory: $(iw reg get 2>/dev/null | head -n 1)"
 
-    if [ -d "/sys/class/net/$WLAN_IF" ]; then
-        echo "AP ($WLAN_IF): UP"
-        echo "AP MAC: $(cat /sys/class/net/$WLAN_IF/address 2>/dev/null)"
-        ip addr show "$WLAN_IF" 2>/dev/null | grep "inet "
+    _active_iface=$(get_active_iface 2>/dev/null)
+    if [ -n "$_active_iface" ] && [ -d "/sys/class/net/$_active_iface" ]; then
+        echo "AP ($_active_iface): UP"
+        echo "AP MAC: $(cat /sys/class/net/$_active_iface/address 2>/dev/null)"
+        ip addr show "$_active_iface" 2>/dev/null | grep "inet "
         if [ -f "$HOSTAPD_PID" ] && kill -0 "$(cat "$HOSTAPD_PID")" 2>/dev/null; then
             echo "hostapd: RUNNING"
             # Show connected stations
             _sta_count=0
-            if [ -S /var/run/hostapd/"$WLAN_IF" ]; then
-                _sta_count=$(hostapd_cli -i "$WLAN_IF" list_sta 2>/dev/null | grep -c "^[0-9a-f]")
+            if [ -S /var/run/hostapd/"$_active_iface" ]; then
+                _sta_count=$(hostapd_cli -i "$_active_iface" list_sta 2>/dev/null | grep -c "^[0-9a-f]")
             fi
             echo "Connected stations: $_sta_count"
         else
             echo "hostapd: STOPPED"
         fi
     else
-        echo "AP ($WLAN_IF): DOWN"
+        echo "AP (${_active_iface:-$WLAN_IF}): DOWN"
     fi
 
     if [ -f "$DNSMASQ_PID" ] && kill -0 "$(cat "$DNSMASQ_PID")" 2>/dev/null; then
@@ -339,21 +514,27 @@ do_status() {
 
 case "$1" in
     start)
-        do_start
+        run_serialized do_start
         ;;
     stop)
-        do_stop
+        run_serialized do_stop
         ;;
     restart)
-        do_stop
-        sleep 2
-        do_start
+        run_serialized do_restart
         ;;
     status)
-        do_status
+        run_serialized do_status
+        ;;
+    hotplug-add)
+        log_msg "Hotplug add event received"
+        run_serialized do_start
+        ;;
+    hotplug-remove)
+        log_msg "Hotplug remove event received"
+        run_serialized do_stop
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|status|hotplug-add|hotplug-remove}"
         exit 1
         ;;
 esac

@@ -1,8 +1,8 @@
 SUMMARY = "CAN Gateway application (SocketCAN-based)"
-PR = "r7"
+PR = "r0"
 DESCRIPTION = "Routes and maps CAN messages across two buses with configuration files."
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=3094a402ce8b402897de2e473744488a"
+LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=a03705619c9eb45e35fe0fa33dffb90b"
 
 # Note: do NOT inherit update-rc.d. This service is started exclusively by
 # firmware-update-service after the startup-compliance boot gate passes
@@ -49,17 +49,26 @@ do_install() {
     install -m 0644 ${S}/../support-files/poweron.wav ${D}${sysconfdir}/ae400/sounds/poweron.wav
     install -m 0644 ${S}/../support-files/poweroff.wav ${D}${sysconfdir}/ae400/sounds/poweroff.wav
     install -m 0644 ${S}/../support-files/Cannotpoweroncheckbreaker.wav ${D}${sysconfdir}/ae400/sounds/Cannotpoweroncheckbreaker.wav
-    # AIT-11: system-fault (trip-active power-on refused) chime
+    # AIT-11: system-fault (trip-active power-on refused) chime (legacy verbose)
     install -m 0644 ${S}/../support-files/SystemFaultCannotPowerOn.wav ${D}${sysconfdir}/ae400/sounds/SystemFaultCannotPowerOn.wav
-    # AIT-60: BMS-disconnected warning chime
+    # AIT-60: BMS-disconnected warning chime (legacy verbose)
     install -m 0644 ${S}/../support-files/BMSDisconnected.wav ${D}${sysconfdir}/ae400/sounds/BMSDisconnected.wav
+    # Status/error cue WAVs unified with web UI assets so the SoT cue name
+    # (breaker_open / system_fault / bms_disconnected) plays the same
+    # recording on the SOM speaker and the browser.
+    install -m 0644 ${S}/../support-files/breaker_open.wav ${D}${sysconfdir}/ae400/sounds/breaker_open.wav
+    install -m 0644 ${S}/../support-files/system_fault.wav ${D}${sysconfdir}/ae400/sounds/system_fault.wav
+    install -m 0644 ${S}/../support-files/bms_disconnected.wav ${D}${sysconfdir}/ae400/sounds/bms_disconnected.wav
     # Install remaining support-files sounds so baseline rootfs matches the
     # OTA `ae400-support` archive (avoids first-boot remediation drift).
     install -m 0644 ${S}/../support-files/UnsupportedCardDetected.wav ${D}${sysconfdir}/ae400/sounds/UnsupportedCardDetected.wav
     install -m 0644 ${S}/../support-files/UpdateAbortedSystemRunning.wav ${D}${sysconfdir}/ae400/sounds/UpdateAbortedSystemRunning.wav
-    install -m 0644 ${S}/../support-files/poweron_backup.wav ${D}${sysconfdir}/ae400/sounds/poweron_backup.wav
-    install -m 0644 ${S}/../support-files/poweroff_backup.wav ${D}${sysconfdir}/ae400/sounds/poweroff_backup.wav
-    install -m 0644 ${S}/../support-files/startup_backup.wav ${D}${sysconfdir}/ae400/sounds/startup_backup.wav
+    # AIT-70 status announcement cues
+    install -m 0644 ${S}/../support-files/ae400_status.wav ${D}${sysconfdir}/ae400/sounds/ae400_status.wav
+    install -m 0644 ${S}/../support-files/connected.wav ${D}${sysconfdir}/ae400/sounds/connected.wav
+    install -m 0644 ${S}/../support-files/island.wav ${D}${sysconfdir}/ae400/sounds/island.wav
+    install -m 0644 ${S}/../support-files/passthrough.wav ${D}${sysconfdir}/ae400/sounds/passthrough.wav
+    install -m 0644 ${S}/../support-files/off.wav ${D}${sysconfdir}/ae400/sounds/off.wav
 
     # Install SysVinit script for auto-start at boot
     install -d ${D}${sysconfdir}/init.d
