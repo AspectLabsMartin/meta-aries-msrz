@@ -22,7 +22,8 @@ B = "${S}"
 SRC_URI = "file://ae400-can-gateway.service"
 
 # Ensure proper build environment
-DEPENDS = ""
+# sqlite3: ae400 owns /var/lib/ae400/store.db (energy counters, history, alarms)
+DEPENDS = "sqlite3"
 
 # The app builds via a local Makefile using CC/CFLAGS from environment
 do_compile() {
@@ -84,7 +85,7 @@ do_install() {
 SYSTEMD_SERVICE:${PN} = "ae400-can-gateway.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
-RDEPENDS:${PN} = "bash alsa-utils"
+RDEPENDS:${PN} = "bash alsa-utils libsqlite3"
 
 # Prevent RPM %dir ownership of shared system directories (/etc/init.d,
 # /etc/modprobe.d, etc.).  Without this, cleansstate rebuilds trigger

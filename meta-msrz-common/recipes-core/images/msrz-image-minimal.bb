@@ -129,7 +129,7 @@ fix_ae400_ownership() {
     fi
 
     # Init scripts: root:root 0755.
-    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service; do
+    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service ae400-rootfs-grow; do
         if [ -f "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}" ]; then
             chown 0:0 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
             chmod 0755 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
@@ -218,6 +218,7 @@ IMAGE_INSTALL += " \
     tzdata \
     iproute2 \
     ae400-hostname \
+    ae400-rootfs-grow \
     can-gateway \
     ae400-fwupdate \
     usb-update-service \
