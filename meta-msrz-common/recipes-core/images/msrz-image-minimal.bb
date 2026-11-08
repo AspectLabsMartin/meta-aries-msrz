@@ -169,6 +169,8 @@ verify_ae400_required_artifacts() {
 /etc/ae400/sounds/island.wav
 /etc/ae400/sounds/passthrough.wav
 /etc/ae400/sounds/off.wav
+/etc/ae400/sounds/short_circuit.wav
+/etc/ae400/sounds/power_change_request.wav
 /usr/share/ae400/config/schema/config_user.schema.json
 /usr/share/ae400/embedded-bundles/image-default.tar.gz
 /usr/share/sounds/system-update-started.wav

@@ -70,6 +70,11 @@ do_install() {
     install -m 0644 ${S}/../support-files/island.wav ${D}${sysconfdir}/ae400/sounds/island.wav
     install -m 0644 ${S}/../support-files/passthrough.wav ${D}${sysconfdir}/ae400/sounds/passthrough.wav
     install -m 0644 ${S}/../support-files/off.wav ${D}${sysconfdir}/ae400/sounds/off.wav
+    # Short-circuit warning, and the core-button "power state change request"
+    # prompt (spec 024 T091): fresh images had them only via the OTA
+    # ae400-support archive, which a first boot does not install
+    install -m 0644 ${S}/../support-files/short_circuit.wav ${D}${sysconfdir}/ae400/sounds/short_circuit.wav
+    install -m 0644 ${S}/../support-files/power_change_request.wav ${D}${sysconfdir}/ae400/sounds/power_change_request.wav
 
     # Install SysVinit script for auto-start at boot
     install -d ${D}${sysconfdir}/init.d
