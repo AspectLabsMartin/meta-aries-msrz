@@ -216,6 +216,25 @@ cleanup_runtime_state() {
     rm -f "$HOSTAPD_RUNTIME_CONF" "$DNSMASQ_RUNTIME_CONF" "$LAST_IFACE_FILE"
 }
 
+# Stop the stock system dnsmasq (/etc/init.d/dnsmasq), which binds 0.0.0.0:53
+# and so prevents our AP dnsmasq from binding 192.168.4.1:53. Only that one:
+# the control-net DHCP server on eth1 (spec 025, config under
+# /run/aspectlabs/control-net/) binds eth1 only, serves no DNS, and must keep
+# running. BusyBox lacks start-stop-daemon, so match on /proc.
+# Returns 0 if a process was signalled.
+stop_stock_dnsmasq() {
+    _found=1
+    for _comm in /proc/[0-9]*/comm; do
+        [ "$(cat "$_comm" 2>/dev/null)" = "dnsmasq" ] || continue
+        _proc=${_comm%/comm}
+        case "$(tr '\0' ' ' < "$_proc/cmdline" 2>/dev/null)" in
+            */control-net/*) continue ;;
+        esac
+        kill "${_proc#/proc/}" 2>/dev/null && _found=0
+    done
+    return "$_found"
+}
+
 # -----------------------------------------------------------------------
 # USB mode-switch: some MT7612U dongles present as a USB CD-ROM
 # (0e8d:2870) on first plug-in.  usb_modeswitch flips them to WiFi mode.
@@ -410,10 +429,7 @@ do_start() {
 
     # --- Step 6: Start DHCP/captive-portal server for AP clients ---
     if [ -f "$DNSMASQ_CONF" ]; then
-        # Stop the stock system dnsmasq — it binds to 0.0.0.0:53 (wildcard)
-        # which prevents our AP dnsmasq from binding to 192.168.4.1:53.
-        # Use killall because BusyBox lacks start-stop-daemon.
-        if killall dnsmasq 2>/dev/null; then
+        if stop_stock_dnsmasq; then
             sleep 1
             log_msg "Stopped stock dnsmasq to free port 53"
         fi
