@@ -114,7 +114,7 @@ fix_ae400_ownership() {
 
     # AE400 binaries in /usr/bin: root-owned 0755.
     for bin in ae400 ae400-webserver database-logger can-flash-tool usb-update-service \
-               ae400-hostname can-gateway bundle-crypt firmware-update-service; do
+               ae400-hostname can-gateway bundle-crypt firmware-update-service control-net.sh; do
         if [ -f "${IMAGE_ROOTFS}/usr/bin/${bin}" ]; then
             chown 0:0 "${IMAGE_ROOTFS}/usr/bin/${bin}"
             chmod 0755 "${IMAGE_ROOTFS}/usr/bin/${bin}"
@@ -129,7 +129,7 @@ fix_ae400_ownership() {
     fi
 
     # Init scripts: root:root 0755.
-    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service ae400-rootfs-grow; do
+    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service ae400-rootfs-grow control-net; do
         if [ -f "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}" ]; then
             chown 0:0 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
             chmod 0755 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
@@ -171,6 +171,9 @@ verify_ae400_required_artifacts() {
 /etc/ae400/sounds/off.wav
 /etc/ae400/sounds/short_circuit.wav
 /etc/ae400/sounds/power_change_request.wav
+/etc/ae400/control-net/dnsmasq-eth1.conf
+/etc/init.d/control-net
+/usr/bin/control-net.sh
 /usr/share/ae400/config/schema/config_user.schema.json
 /usr/share/ae400/embedded-bundles/image-default.tar.gz
 /usr/share/sounds/system-update-started.wav
@@ -222,6 +225,7 @@ IMAGE_INSTALL += " \
     ae400-hostname \
     ae400-rootfs-grow \
     can-gateway \
+    control-net \
     ae400-fwupdate \
     usb-update-service \
     web-server \

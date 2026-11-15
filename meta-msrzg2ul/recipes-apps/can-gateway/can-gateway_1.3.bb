@@ -1,5 +1,5 @@
 SUMMARY = "CAN Gateway application (SocketCAN-based)"
-PR = "r0"
+PR = "r1"
 DESCRIPTION = "Routes and maps CAN messages across two buses with configuration files."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=a03705619c9eb45e35fe0fa33dffb90b"
@@ -23,7 +23,8 @@ SRC_URI = "file://ae400-can-gateway.service"
 
 # Ensure proper build environment
 # sqlite3: ae400 owns /var/lib/ae400/store.db (energy counters, history, alarms)
-DEPENDS = "sqlite3"
+# openssl: libcrypto SHA-256 for the EM-50 meter digest authentication (spec 025)
+DEPENDS = "sqlite3 openssl"
 
 # The app builds via a local Makefile using CC/CFLAGS from environment
 do_compile() {
@@ -90,7 +91,7 @@ do_install() {
 SYSTEMD_SERVICE:${PN} = "ae400-can-gateway.service"
 SYSTEMD_AUTO_ENABLE = "enable"
 
-RDEPENDS:${PN} = "bash alsa-utils libsqlite3"
+RDEPENDS:${PN} = "bash alsa-utils libsqlite3 libcrypto"
 
 # Prevent RPM %dir ownership of shared system directories (/etc/init.d,
 # /etc/modprobe.d, etc.).  Without this, cleansstate rebuilds trigger
