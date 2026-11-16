@@ -178,8 +178,8 @@ install_ae400_service_ssh_keys() {
         line=$(printf '%s' "${line}" | tr -d '\r')
         case "${line}" in
             ''|'#'*) ;;
-            ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *) keys=$((keys + 1)) ;;
-            ssh-rsa\ *) keys=$((keys + 1))
+            ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *) keys=$(expr ${keys} + 1) ;;
+            ssh-rsa\ *) keys=$(expr ${keys} + 1)
                 bbwarn "${src}: RSA key works with dropbear 2019.78 only as ssh-rsa (SHA-1); prefer ECDSA" ;;
             ssh-ed25519\ *) bbfatal "${src}: ed25519 key; dropbear 2019.78 cannot use it, use ECDSA (ssh-keygen -t ecdsa)" ;;
             *) bbfatal "${src}: line is not a supported public key: ${line}" ;;
