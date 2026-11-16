@@ -1,2 +1,7 @@
 # Auto-start dropbear SSH server
 NO_START=0
+
+# Key login only: -s turns password logins off, and there is no -B, so an
+# account with a blank password (root) cannot log in over SSH. can-gateway
+# rewrites NO_START from the ssh_enabled setting and keeps this line hardened.
+DROPBEAR_EXTRA_ARGS="-s"

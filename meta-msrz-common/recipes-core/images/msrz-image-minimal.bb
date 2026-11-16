@@ -6,6 +6,15 @@ LICENSE = "MIT"
 
 inherit core-image
 
+# Root SSH is key only (ae400 spec 026 §5 item 10). The build's local.conf
+# sets EXTRA_IMAGE_FEATURES ?= "debug-tweaks", which makes dropbear accept
+# root with a blank password (-B). Drop that here so the image does not depend
+# on local.conf. empty-root-password keeps the root login on the serial
+# console (ttySC0, inside the enclosure) as it was; allow-root-login keeps -w
+# off dropbear. Service access over the network: /home/root/.ssh/authorized_keys.
+IMAGE_FEATURES_remove = "debug-tweaks allow-empty-password"
+IMAGE_FEATURES += "empty-root-password allow-root-login"
+
 # Fix host-uid contamination from externalsrc recipes. The `install -m` calls
 # in externalsrc do_install do not set ownership, so files inherit the host
 # uid/gid (1000:1000). Individual recipes try to chown in pkg_postinst but
@@ -190,6 +199,18 @@ EOF
 
     if [ -e "${IMAGE_ROOTFS}${sysconfdir}/ae400/users.json" ]; then
         bbfatal "Factory image must not contain /etc/ae400/users.json; bootstrap creates it on first boot"
+    fi
+
+    # Root SSH policy guard: no blank-password logins, password logins off.
+    local dropbear_default="${IMAGE_ROOTFS}${sysconfdir}/default/dropbear"
+    if [ ! -f "${dropbear_default}" ]; then
+        bbfatal "Missing ${sysconfdir}/default/dropbear"
+    fi
+    if grep -Eq '^DROPBEAR_EXTRA_ARGS=.*-[A-Za-z]*B' "${dropbear_default}"; then
+        bbfatal "dropbear allows blank-password logins (-B in ${sysconfdir}/default/dropbear); is allow-empty-password or debug-tweaks in IMAGE_FEATURES?"
+    fi
+    if ! grep -Eq '^DROPBEAR_EXTRA_ARGS=.*-[A-Za-z]*s' "${dropbear_default}"; then
+        bbfatal "dropbear allows password logins (no -s in ${sysconfdir}/default/dropbear)"
     fi
 
     # Ownership regression guard: /etc/ae400 MUST NOT be owned by a host uid.
