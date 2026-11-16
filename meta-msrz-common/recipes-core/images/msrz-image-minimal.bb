@@ -15,6 +15,12 @@ inherit core-image
 IMAGE_FEATURES_remove = "debug-tweaks allow-empty-password"
 IMAGE_FEATURES += "empty-root-password allow-root-login"
 
+# Service SSH keys: the ae400 repo's config/security/service-ssh-authorized_keys
+# (public keys only) becomes root's authorized_keys. dropbear 2019.78 takes
+# ECDSA keys, RSA only as ssh-rsa (SHA-1), and no ed25519.
+AE400_SERVICE_SSH_KEYS ?= "${TOPDIR}/../config/security/service-ssh-authorized_keys"
+do_rootfs[file-checksums] += "${AE400_SERVICE_SSH_KEYS}:True"
+
 # Fix host-uid contamination from externalsrc recipes. The `install -m` calls
 # in externalsrc do_install do not set ownership, so files inherit the host
 # uid/gid (1000:1000). Individual recipes try to chown in pkg_postinst but
@@ -23,6 +29,7 @@ IMAGE_FEATURES += "empty-root-password allow-root-login"
 # uids numerically from the target rootfs and corrects ownership + modes on
 # all AE400 paths.
 ROOTFS_POSTPROCESS_COMMAND += "fix_ae400_ownership;"
+ROOTFS_POSTPROCESS_COMMAND += "install_ae400_service_ssh_keys;"
 ROOTFS_POSTPROCESS_COMMAND += "verify_ae400_required_artifacts;"
 
 fix_ae400_ownership() {
@@ -152,6 +159,42 @@ fix_ae400_ownership() {
     fi
 
     bbnote "fix_ae400_ownership: complete"
+}
+
+install_ae400_service_ssh_keys() {
+    local src="${AE400_SERVICE_SSH_KEYS}"
+    local ssh_dir="${IMAGE_ROOTFS}${ROOT_HOME}/.ssh"
+    local keys=0
+
+    if [ ! -f "${src}" ]; then
+        bbfatal "Service SSH keys missing: ${src}"
+    fi
+    if grep -q 'PRIVATE KEY' "${src}"; then
+        bbfatal "${src} holds a private key; it must hold public keys only"
+    fi
+
+    # One key per line; blank lines and # comments allowed. CRLF is tolerated.
+    while IFS= read -r line; do
+        line=$(printf '%s' "${line}" | tr -d '\r')
+        case "${line}" in
+            ''|'#'*) ;;
+            ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *) keys=$((keys + 1)) ;;
+            ssh-rsa\ *) keys=$((keys + 1))
+                bbwarn "${src}: RSA key works with dropbear 2019.78 only as ssh-rsa (SHA-1); prefer ECDSA" ;;
+            ssh-ed25519\ *) bbfatal "${src}: ed25519 key; dropbear 2019.78 cannot use it, use ECDSA (ssh-keygen -t ecdsa)" ;;
+            *) bbfatal "${src}: line is not a supported public key: ${line}" ;;
+        esac
+    done < "${src}"
+
+    if [ "${keys}" -eq 0 ]; then
+        bbfatal "${src} holds no key; with password logins off the unit would have no SSH access"
+    fi
+
+    install -d -m 0700 -o 0 -g 0 "${ssh_dir}"
+    tr -d '\r' < "${src}" | grep -v -e '^#' -e '^$' > "${ssh_dir}/authorized_keys"
+    chown 0:0 "${ssh_dir}/authorized_keys"
+    chmod 0600 "${ssh_dir}/authorized_keys"
+    bbnote "install_ae400_service_ssh_keys: ${keys} key(s) in ${ROOT_HOME}/.ssh/authorized_keys"
 }
 
 verify_ae400_required_artifacts() {
