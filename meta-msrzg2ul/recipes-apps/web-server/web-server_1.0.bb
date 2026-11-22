@@ -1,5 +1,5 @@
 SUMMARY = "AE400 Inverter Web Server"
-PR = "r9"
+PR = "r10"
 DESCRIPTION = "Single-threaded embedded HTTP server for AE400 inverter system with UI"
 LICENSE = "CLOSED"
 
