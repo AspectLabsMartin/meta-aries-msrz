@@ -1,5 +1,5 @@
 SUMMARY = "CAN Gateway application (SocketCAN-based)"
-PR = "r3"
+PR = "r4"
 DESCRIPTION = "Routes and maps CAN messages across two buses with configuration files."
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://README.md;beginline=1;endline=20;md5=a03705619c9eb45e35fe0fa33dffb90b"
