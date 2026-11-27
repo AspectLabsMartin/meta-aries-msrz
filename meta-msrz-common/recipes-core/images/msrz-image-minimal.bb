@@ -130,7 +130,7 @@ fix_ae400_ownership() {
 
     # AE400 binaries in /usr/bin: root-owned 0755.
     for bin in ae400 ae400-webserver database-logger can-flash-tool usb-update-service \
-               ae400-hostname can-gateway bundle-crypt firmware-update-service control-net.sh; do
+               ae400-hostname can-gateway bundle-crypt firmware-update-service control-net.sh mqtt-bridge; do
         if [ -f "${IMAGE_ROOTFS}/usr/bin/${bin}" ]; then
             chown 0:0 "${IMAGE_ROOTFS}/usr/bin/${bin}"
             chmod 0755 "${IMAGE_ROOTFS}/usr/bin/${bin}"
@@ -145,7 +145,7 @@ fix_ae400_ownership() {
     fi
 
     # Init scripts: root:root 0755.
-    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service ae400-rootfs-grow control-net; do
+    for init in ae400 ae400-webserver database-logger firmware-update-service usb-update-service ae400-rootfs-grow control-net mqtt-bridge; do
         if [ -f "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}" ]; then
             chown 0:0 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
             chmod 0755 "${IMAGE_ROOTFS}${sysconfdir}/init.d/${init}"
@@ -226,6 +226,8 @@ verify_ae400_required_artifacts() {
 /etc/ae400/control-net/dnsmasq-eth1.conf
 /etc/init.d/control-net
 /usr/bin/control-net.sh
+/etc/init.d/mqtt-bridge
+/usr/bin/mqtt-bridge
 /usr/share/ae400/config/schema/config_user.schema.json
 /usr/share/ae400/embedded-bundles/image-default.tar.gz
 /usr/share/sounds/system-update-started.wav
@@ -295,6 +297,7 @@ IMAGE_INSTALL += " \
     web-server \
     can-flash-tool \
     database-logger \
+    mqtt-bridge \
     iw \
     wpa-supplicant \
     hostapd \
